@@ -266,6 +266,8 @@
       <button class="bigBtn ghost sndBtn sndSfxBtn"></button>
       <button class="bigBtn ghost sndBtn sndMusBtn"></button>
       <button class="bigBtn ghost hidden" id="installBtn">📲 TELEPÍTÉS</button>
+      <button class="bigBtn ghost" id="exportSaveBtn">📤 Mentés kimásolása</button>
+      <button class="bigBtn ghost" id="importSaveBtn">📥 Mentés beillesztése</button>
     </div>
     <div class="controlsHint" id="controlsHint"></div>
   </div>
@@ -472,6 +474,43 @@ const HERO_STATS_KEY = 'kilencpecset_herostats_v1';
 let heroStats = { plays:{}, mult:{}, abilityUses:{}, abilityMult:{}, lastCheck:'' };
 try{ const s=localStorage.getItem(HERO_STATS_KEY); if(s) heroStats = Object.assign({plays:{},mult:{},abilityUses:{},abilityMult:{},lastCheck:''}, JSON.parse(s)); }catch(e){}
 function saveHeroStats(){ try{ localStorage.setItem(HERO_STATS_KEY, JSON.stringify(heroStats)); }catch(e){} }
+
+/* =========================================================
+   MENTÉS-KÓD — hordozható másolat a haladásodról (profil-szint,
+   feloldott hősök/pecsétek alapja, egyéni finomhangolás), amit
+   átvihetsz egy másik eszközre. Nem automatikus/felhős szinkron —
+   neked kell átmásolnod a kódot —, de nem igényel se szervert, se fiókot.
+   ========================================================= */
+function buildSaveCode(){
+  try{
+    const payload = { v:1, profile, heroStats };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  }catch(e){ return null; }
+}
+function applySaveCode(code){
+  try{
+    const payload = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    if(!payload || typeof payload!=='object') throw new Error('rossz formátum');
+    if(payload.profile) { profile = payload.profile; saveProfile(); }
+    if(payload.heroStats) { heroStats = Object.assign({plays:{},mult:{},abilityUses:{},abilityMult:{},lastCheck:''}, payload.heroStats); saveHeroStats(); }
+    return true;
+  }catch(e){ return false; }
+}
+document.getElementById('exportSaveBtn').addEventListener('click', ()=>{
+  const code = buildSaveCode();
+  if(!code){ alert('Nem sikerült elkészíteni a mentés-kódot.'); return; }
+  window.prompt('Másold ki ezt a kódot (Ctrl+C / hosszan nyomva "Másolás"), és mentsd el valahova (pl. jegyzet, magadnak küldött üzenet) — ezt illeszd be a másik eszközön:', code);
+});
+document.getElementById('importSaveBtn').addEventListener('click', ()=>{
+  const code = window.prompt('Illeszd be ide a másik eszközön kapott mentés-kódot:', '');
+  if(!code) return;
+  if(applySaveCode(code)){
+    alert('Sikeres betöltés! Az oldal újratöltődik.');
+    location.reload();
+  } else {
+    alert('Ez a kód nem érvényes vagy sérült — ellenőrizd, hogy a teljes kódot bemásoltad-e.');
+  }
+});
 function recordHeroPlay(clsId){
   heroStats.plays[clsId] = (heroStats.plays[clsId]||0) + 1;
   saveHeroStats();
@@ -797,12 +836,12 @@ const ABILITIES = {
     run(p,r){ nearestEnemies(p.x,p.y,280,2+r).forEach(en=>{ en.hp-=14+r*6; en.hitFlash=8; addUltCharge(5);
       game.particles.push({x:p.x,y:p.y,vx:0,vy:0,life:1,color:'#fff',bolt:{tx:en.x,ty:en.y}}); });
       if(game.boss&&dist(game.boss.x,game.boss.y,p.x,p.y)<280){ game.boss.hp-=12; game.boss.hitFlash=8; } } },
-  heal:{ label:'Gyógyulás', icon:'✨', req:1, cdMax:560, maxRank:3, desc:'Azonnal életerőt ad.',
+  heal:{ label:'Gyógyulás', icon:'✨', req:1, cdMax:475, maxRank:3, desc:'Azonnal életerőt ad.',
     run(p,r){ p.hp=Math.min(p.maxHp,p.hp+p.maxHp*(0.22+r*0.06)); addParticles(p.x,p.y,'#8affc1',18); } },
   surge:{ label:'Löket', icon:'🌀', req:1, cdMax:520, maxRank:3, desc:'Gyorsabb mozgás és tüzelés.',
     run(p,r){ p.surgeActive=140+r*30; } },
   turret:{ label:'Ágyú', icon:'🤖', req:1, cdMax:620, maxRank:3, desc:'Automata torony.',
-    run(p,r){ game.turrets.push({x:p.x,y:p.y,life:330+r*60,fireCd:0,dmg:6+r*2}); } },
+    run(p,r){ game.turrets.push({x:p.x,y:p.y,life:413+r*75,fireCd:0,dmg:6+r*2}); } },
   meteor:{ label:'Meteor', icon:'☄️', req:1, cdMax:680, maxRank:4, desc:'Becsapódás a célzott pontra.',
     run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:42,r:95+r*10,dmg:40+r*10,exploded:false,color:'#ff8c3c'}); } },
   shotgun:{ label:'Sörét', icon:'🔫', req:1, cdMax:170, maxRank:4, desc:'Hét lövedékes szórás előre.',
@@ -813,14 +852,14 @@ const ABILITIES = {
     run(p,r){ const d=150+r*25; p.x=clamp(p.x+Math.cos(p.facing)*d,p.r,canvas.width-p.r); p.y=clamp(p.y+Math.sin(p.facing)*d,safeTop+p.r*0.5,canvas.height-safeBottom-p.r*0.5); p.invuln=10; resolveObstacles(p); addParticles(p.x,p.y,p.color,14); } },
   shockwave:{ label:'Lökéshullám', icon:'🌊', req:2, cdMax:350, maxRank:3, desc:'Ellök és sebez körben.',
     run(p,r){ aoeDamage(p.x,p.y,140+r*15,14+r*6,'#9fe'); knockback(p.x,p.y,170+r*15,36+r*8); addParticles(p.x,p.y,'#9fe',20); } },
-  lifesteal:{ label:'Vérszívás', icon:'🩸', req:2, cdMax:640, maxRank:3, desc:'Egy időre a sebzésed gyógyít.',
+  lifesteal:{ label:'Vérszívás', icon:'🩸', req:2, cdMax:510, maxRank:3, desc:'Egy időre a sebzésed gyógyít.',
     run(p,r){ p.buffs.lifesteal=Math.max(p.buffs.lifesteal,220+r*40); } },
   berserk:{ label:'Düh', icon:'😤', req:2, cdMax:580, maxRank:3, desc:'Nagyobb sebzés, több sérülés.',
     run(p,r){ p.buffs.berserk=Math.max(p.buffs.berserk,220+r*30); } },
   multishot:{ label:'Sortűz', icon:'🎇', req:2, cdMax:540, maxRank:3, desc:'Egy időre három irányba lősz.',
     run(p,r){ p.buffs.multishot=Math.max(p.buffs.multishot,200+r*35); } },
   poison:{ label:'Méregfelhő', icon:'☠️', req:2, cdMax:400, maxRank:3, desc:'Folyamatosan sebző felhő.',
-    run(p,r){ game.clouds.push({x:input.aimX,y:input.aimY,r:75+r*10,life:180,dmg:1.0+r*0.4}); } },
+    run(p,r){ game.clouds.push({x:input.aimX,y:input.aimY,r:75+r*10,life:180,dmg:3+r*1.6}); } },
   cluster:{ label:'Szórásbomba', icon:'🧨', req:2, cdMax:380, maxRank:3, desc:'Több kis robbanás körülötted.',
     run(p,r){ for(let i=0;i<3+r;i++){ const a=Math.random()*Math.PI*2, d=40+Math.random()*90;
       game.meteors.push({x:p.x+Math.cos(a)*d,y:p.y+Math.sin(a)*d,t:0,delay:18+i*6,r:60,dmg:17+r*5,exploded:false,color:'#ff8c3c'}); } } },
@@ -841,7 +880,7 @@ const ABILITIES = {
   raise:{ label:'Idézés', icon:'💀', req:1, cdMax:280, maxRank:3, desc:'Csontváz szolgát idézel, aki üldözi és közelharcban sebzi az ellenfeleket.', cls:'necromancer',
     run(p,r){ game.turrets.push({x:p.x,y:p.y-20,life:260+r*70,fireCd:0,dmg:7+r*3,mobile:true,skeleton:true}); } },
   soulbomb:{ label:'Lélekbomba', icon:'💥', req:1, cdMax:320, maxRank:3, desc:'Robbanás a célzott ponton.', cls:'necromancer',
-    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:32,r:80+r*10,dmg:24+r*8,exploded:false,color:'#9d5cff'}); } },
+    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:32,r:80+r*10,dmg:26+r*9,exploded:false,color:'#9d5cff'}); } },
   boneward:{ label:'Csontpajzs', icon:'🦴', req:1, cdMax:520, maxRank:3, desc:'Ideiglenesen jelentősen csökkenti a rád eső sebzést.', cls:'necromancer',
     run(p,r){ p.buffs.boneward=Math.max(p.buffs.boneward,150+r*30); } },
 
@@ -862,7 +901,7 @@ const ABILITIES = {
     run(p,r){ for(let i=0;i<3;i++){ const a=(i/3)*Math.PI*2+Math.random()*0.6, d=50+Math.random()*40;
       game.traps.push({x:p.x+Math.cos(a)*d,y:p.y+Math.sin(a)*d,r:30,dmg:18+r*7,root:40,armed:true}); } } },
   laserwall:{ label:'Lézerfal', icon:'🔺', req:1, cdMax:380, maxRank:3, desc:'Zúgó energiamező a célzott ponton — mindenkit sebez, aki belelép.', cls:'engineer',
-    run(p,r){ game.clouds.push({x:input.aimX,y:input.aimY,r:70+r*8,life:170,dmg:2.4+r*0.7,color:'#ff9d4d'}); } },
+    run(p,r){ game.clouds.push({x:input.aimX,y:input.aimY,r:70+r*8,life:170,dmg:4+r*2,color:'#ff9d4d'}); } },
   repairdrone:{ label:'Javító-drón', icon:'🔧', req:1, cdMax:460, maxRank:3, desc:'Lebegő drónt telepítesz, ami a közeledben folyamatosan gyógyít.', cls:'engineer',
     run(p,r){ game.drones.push({x:p.x,y:p.y-30,life:340+r*70,fireCd:0,heal:0.4+r*0.15}); } },
 
@@ -2140,6 +2179,11 @@ function update(){
       }
       return;
     }
+    // fontos: a sebző felhők nem minden képkockán ütnek, hanem 8 képkockánként —
+    // korábban hiányzott ez az ütemezés, ami 60x/mp-es sebzést eredményezett (hiba javítva)
+    c.dmgCd = (c.dmgCd||0) - 1;
+    if(c.dmgCd>0) return;
+    c.dmgCd = 8;
     game.enemies.forEach(en=>{ if(dist(en.x,en.y,c.x,c.y)<c.r+en.r){ en.hp-=c.dmg; en.hitFlash=2; } });
     if(game.boss && dist(game.boss.x,game.boss.y,c.x,c.y)<c.r+game.boss.r){ game.boss.hp-=c.dmg*0.6; }
   });
