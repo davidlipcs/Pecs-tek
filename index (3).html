@@ -1,0 +1,3191 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>A Kilenc Pecsét</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0e14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kilenc Pecsét">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --ui-scale: 1;
+    --bg: #0a0e14;
+    --accent: #6ee7ff;
+    --accent2: #ff5c7c;
+    --gold: #ffd166;
+    --text: #e8ecf3;
+    --dim: #7d8aa3;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background: radial-gradient(ellipse at 50% 0%, #131b2c 0%, var(--bg) 70%);
+    font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+    color: var(--text);
+    user-select: none; -webkit-user-select:none; -webkit-tap-highlight-color: transparent;
+  }
+  canvas{ display:block; background: transparent; }
+  #game{ touch-action: none; }
+  #gameWrap{ position:relative; width:100vw; height:100vh; height:100dvh; }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between;
+    align-items:flex-start; padding: calc(10px*var(--ui-scale)) calc(14px*var(--ui-scale));
+    padding-top: max(calc(10px*var(--ui-scale)), env(safe-area-inset-top)); pointer-events:none; z-index:5; }
+  .panel{ background: linear-gradient(180deg, rgba(18,24,38,0.9), rgba(10,14,20,0.85));
+    border:1px solid rgba(110,231,255,0.25); border-radius:calc(10px*var(--ui-scale)); padding:calc(7px*var(--ui-scale)) calc(11px*var(--ui-scale));
+    box-shadow: 0 0 20px rgba(0,0,0,0.4); }
+  #hpWrap{ width:calc(210px*var(--ui-scale)); max-width:44vw; }
+  #hpLabel{ font-size:calc(12px*var(--ui-scale)); letter-spacing:1px; color:var(--dim); margin-bottom:4px; }
+  #hpBarBg{ width:100%; height:calc(13px*var(--ui-scale)); background:#1c2333; border-radius:7px; overflow:hidden; border:1px solid #2a3348; }
+  #hpBarFill{ height:100%; width:100%; background: linear-gradient(90deg, var(--accent2), #ff8a9d); transition: width .15s; }
+  #xpWrap{ width:calc(210px*var(--ui-scale)); max-width:44vw; margin-top:calc(6px*var(--ui-scale)); }
+  #xpBarBg{ width:100%; height:calc(7px*var(--ui-scale)); background:#1c2333; border-radius:5px; overflow:hidden; border:1px solid #2a3348; }
+  #xpBarFill{ height:100%; width:0%; background: linear-gradient(90deg, var(--gold), #ffe9a8); transition: width .15s; }
+  #lvlLabel{ font-size:calc(11px*var(--ui-scale)); color:var(--gold); margin-top:4px; letter-spacing:1px;}
+  #waveInfo{ text-align:right; }
+  #waveTitle{ font-size:calc(12px*var(--ui-scale)); color:var(--dim); letter-spacing:2px; }
+  #waveNum{ font-size:calc(23px*var(--ui-scale)); font-weight:bold; color:var(--accent); text-shadow:0 0 12px rgba(110,231,255,0.5); }
+  #enemyCount{ font-size:calc(11px*var(--ui-scale)); color:var(--dim); margin-top:2px; }
+  #modeTag{ font-size:calc(10px*var(--ui-scale)); color:var(--gold); margin-top:2px; }
+
+  /* pause gomb */
+  #pauseBtn{ position:absolute; top: max(calc(10px*var(--ui-scale)), env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    z-index:6; width:calc(40px*var(--ui-scale)); height:calc(40px*var(--ui-scale)); border-radius:calc(11px*var(--ui-scale)); border:1px solid rgba(110,231,255,0.35);
+    background: rgba(18,24,38,0.9); color:var(--accent); font-size:calc(18px*var(--ui-scale)); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 0 16px rgba(0,0,0,0.4); }
+  #pauseBtn:active{ transform:translateX(-50%) scale(0.94); }
+
+  #abilityBar{ position:absolute; bottom: calc(10px*var(--ui-scale)); bottom: max(calc(10px*var(--ui-scale)), env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
+    display:flex; gap:calc(6px*var(--ui-scale)); z-index:5; flex-wrap:wrap; justify-content:center; max-width:96vw; pointer-events:none; }
+  .abIcon{ width:calc(40px*var(--ui-scale)); height:calc(40px*var(--ui-scale)); border-radius:calc(8px*var(--ui-scale)); background: rgba(18,24,38,0.9); border:2px solid #2a3348;
+    display:flex; align-items:center; justify-content:center; font-size:calc(16px*var(--ui-scale)); position:relative;
+    opacity:0.3; filter: grayscale(1); transition: all .2s; pointer-events:auto; cursor:pointer; touch-action:none; }
+  .abIcon.unlocked{ opacity:1; filter:none; border-color: var(--accent); box-shadow:0 0 10px rgba(110,231,255,0.35); }
+  .abIcon.unlocked:active{ transform: scale(0.9); }
+  .abIcon .key{ position:absolute; bottom:-3px; right:1px; font-size:calc(8px*var(--ui-scale)); color:var(--dim);
+    background:#0a0e14; padding:1px 3px; border-radius:4px; }
+  .abIcon .cd{ position:absolute; inset:0; border-radius:calc(8px*var(--ui-scale)); background: rgba(0,0,0,0.65);
+    display:flex; align-items:center; justify-content:center; font-size:calc(12px*var(--ui-scale)); font-weight:bold; color:#fff; pointer-events:none; }
+
+  /* ---------- Overlays ---------- */
+  .overlay{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    text-align:center; background: radial-gradient(circle at 50% 40%, rgba(20,26,40,0.97), rgba(6,8,12,0.99));
+    z-index:20; padding:20px; overflow-y:auto; }
+  /* rugalmas térkitöltők: ha elfér a tartalom, középre kerül; ha nem, felülről görgethető
+     (a justify-content:center túlcsordulásnál levágná a tetejét — pl. a karakter-előnézetet) */
+  .overlay::before, .overlay::after{ content:''; flex:1 0 12px; }
+  /* keskeny kijelzőn semmi ne lógjon ki oldalra */
+  .overlay > *{ max-width:100%; }
+  .hidden{ display:none !important; }
+  h1.title{ font-size:clamp(28px, 9vw, 46px); margin:0 0 6px 0; letter-spacing:3px;
+    background: linear-gradient(180deg, #fff, var(--accent)); -webkit-background-clip:text; background-clip:text;
+    color:transparent; text-shadow:0 0 40px rgba(110,231,255,0.3); }
+  .subtitle{ color:var(--dim); font-size:14px; max-width:560px; line-height:1.55; margin-bottom:16px; }
+  .charCustom{ display:flex; gap:28px; align-items:center; margin-bottom:12px; flex-wrap:wrap; justify-content:center; }
+  #previewCanvas{ border-radius:18px; background:#121826; border:2px solid #2a3348; }
+  .colorRow{ display:flex; gap:10px; }
+  .swatch{ width:32px; height:32px; border-radius:50%; cursor:pointer; border:3px solid transparent; pointer-events:all; }
+  .swatch.selected{ border-color:#fff; box-shadow:0 0 10px rgba(255,255,255,0.6); }
+  input#nameInput{ background:#121826; border:1px solid #2a3348; color:var(--text); padding:9px 14px;
+    border-radius:8px; font-size:14px; text-align:center; width:210px; pointer-events:all; outline:none; }
+  input#nameInput:focus{ border-color:var(--accent); }
+  button.bigBtn{ pointer-events:all; background: linear-gradient(180deg, var(--accent), #3fb8d6); color:#031017;
+    border:none; padding:13px 34px; font-size:17px; font-weight:bold; border-radius:10px; cursor:pointer;
+    letter-spacing:1px; margin:6px; box-shadow:0 6px 20px rgba(110,231,255,0.3); transition: transform .1s; }
+  button.bigBtn:hover{ transform: translateY(-2px); }
+  button.bigBtn.red{ background: linear-gradient(180deg, var(--accent2), #c9334d); box-shadow:0 6px 20px rgba(255,92,124,0.3); }
+  button.bigBtn.gold{ background: linear-gradient(180deg, var(--gold), #d9a53f); box-shadow:0 6px 20px rgba(255,209,102,0.3); }
+  button.bigBtn.ghost{ background: rgba(18,24,38,0.9); color:var(--text); border:1px solid #2a3348; box-shadow:none; }
+  button.bigBtn.sndBtn{ padding:8px 16px; font-size:12px; margin:3px; }
+  /* kontrolleres menü-fókusz kerete */
+  .padFocus{ outline:3px solid var(--gold) !important; outline-offset:3px; }
+  .storyBox{ max-width:580px; color:var(--text); font-size:14px; line-height:1.65; margin-bottom:18px; }
+  .controlsHint{ font-size:11.5px; color:var(--dim); margin-top:12px; line-height:1.7; max-width:600px; }
+  .bestiary{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:640px; margin-bottom:12px; }
+  .bEntry{ background:#121826; border:1px solid #2a3348; border-radius:8px; padding:6px 10px; font-size:11px; color:var(--dim); }
+  .bEntry b{ color:var(--text); }
+
+  .pickLabel{ font-size:11px; letter-spacing:2px; color:var(--dim); margin:6px 0 6px; }
+  .headRow{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:6px; }
+  .headOpt{ border-radius:12px; background:#121826; border:2px solid #2a3348; cursor:pointer; padding:2px; pointer-events:all; }
+  .headOpt.selected{ border-color:#fff; box-shadow:0 0 12px rgba(255,255,255,0.45); }
+  .diffRow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:14px; }
+  .diffBtn{ pointer-events:all; cursor:pointer; background:#121826; border:2px solid #2a3348; color:var(--text);
+    border-radius:10px; padding:8px 14px; font-size:13px; font-weight:bold; letter-spacing:1px; min-width:96px; }
+  .diffBtn small{ display:block; font-weight:normal; font-size:10px; color:var(--dim); margin-top:2px; letter-spacing:0; }
+  .diffBtn.selected{ border-color:var(--diffcol,#fff); box-shadow:0 0 12px var(--diffcol,#fff); color:#fff; }
+
+  #levelUpBanner{ position:absolute; top:36%; left:50%; transform:translate(-50%,-50%); text-align:center; z-index:15; pointer-events:none; }
+  #levelUpBanner .lu1{ font-size:13px; color:var(--gold); letter-spacing:4px; }
+  #levelUpBanner .lu2{ font-size:30px; font-weight:bold; color:#fff; text-shadow:0 0 20px var(--gold); }
+  #levelUpBanner .lu3{ font-size:14px; color:var(--accent); margin-top:4px; }
+
+  /* ---- Profil / class / loadout menü ---- */
+  #profileBar{ display:flex; gap:16px; align-items:center; justify-content:center; margin-bottom:10px;
+    font-size:12px; color:var(--dim); }
+  #profileBar b{ color:var(--gold); }
+  #profXpBg{ width:160px; height:7px; background:#1c2333; border-radius:5px; overflow:hidden; border:1px solid #2a3348; }
+  #profXpFill{ height:100%; background:linear-gradient(90deg,var(--gold),#ffe9a8); width:0%; }
+
+  .classRow{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; max-width:760px; }
+  .classCard{ pointer-events:all; cursor:pointer; width:150px; background:#101623; border:2px solid #2a3348;
+    border-radius:12px; padding:8px 10px 10px; text-align:left; position:relative; transition:transform .1s; }
+  .classCard:hover{ transform:translateY(-2px); }
+  .classCard.selected{ border-color:var(--ccol,#fff); box-shadow:0 0 14px var(--ccol,#fff); }
+  .classCard.locked{ opacity:0.5; filter:grayscale(0.7); cursor:not-allowed; }
+  .classCard.sealedCard{ border-color:#ffd166; box-shadow:0 0 10px rgba(255,209,102,0.35); }
+  .classCard.sealedCard.locked{ opacity:0.65; filter:grayscale(0.4); box-shadow:0 0 8px rgba(255,209,102,0.2); }
+  .classCard .cName{ font-size:15px; font-weight:bold; color:var(--ccol,#fff); display:flex; align-items:center; gap:6px; }
+  .classCard .cRole{ font-size:10px; letter-spacing:1px; color:var(--dim); margin-bottom:4px; }
+  .classCard .cLine{ font-size:10.5px; color:var(--text); line-height:1.5; }
+  .classCard .cLine .g{ color:#7dffb0; } .classCard .cLine .b{ color:#ff8a9d; }
+  .classCard .cUlt{ font-size:10px; color:var(--accent); margin-top:4px; }
+  .classCard .lockTag{ position:absolute; top:6px; right:8px; font-size:10px; color:var(--gold); }
+
+  .loadoutWrap{ max-width:720px; }
+  .abilityGrid{ display:flex; gap:7px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; }
+  .abCell{ pointer-events:all; cursor:pointer; width:60px; height:66px; background:#101623; border:2px solid #2a3348;
+    border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; }
+  .abCell .ic{ font-size:22px; } .abCell .nm{ font-size:8.5px; color:var(--dim); text-align:center; line-height:1.1; margin-top:2px; padding:0 2px; }
+  .abCell.equipped{ border-color:var(--accent); box-shadow:0 0 10px rgba(110,231,255,0.35); }
+  .abCell.locked{ opacity:0.4; filter:grayscale(1); cursor:not-allowed; }
+  .abCell .slotNum{ position:absolute; top:-7px; left:-7px; width:18px; height:18px; border-radius:50%;
+    background:var(--accent); color:#031017; font-size:11px; font-weight:bold; display:flex; align-items:center; justify-content:center; }
+  .abCell .lk{ position:absolute; top:2px; right:4px; font-size:9px; color:var(--gold); }
+  .abCell.epicCell{ height:78px; border-color:#ff5c3c; box-shadow:0 0 8px rgba(255,92,60,0.3); }
+  .abCell.epicCell.equipped{ border-color:#ff5c3c; box-shadow:0 0 12px rgba(255,92,60,0.55); }
+  .abCell.legendaryCell{ height:78px; border-color:#c9a6ff; box-shadow:0 0 9px rgba(201,166,255,0.4); }
+  .abCell.legendaryCell.equipped{ border-color:#ffd166; box-shadow:0 0 14px rgba(255,209,102,0.6); }
+  .abCell .epicTag{ position:absolute; top:-9px; left:50%; transform:translateX(-50%); white-space:nowrap;
+    font-size:6.5px; letter-spacing:0.5px; font-weight:bold; color:#0a0e14; background:#ff5c3c;
+    border-radius:5px; padding:1px 4px; }
+  .abCell .epicTag.legendaryTag{ background:linear-gradient(90deg,#c9a6ff,#ffd166); }
+  .abCell .nerfDot{ position:absolute; bottom:-6px; right:-6px; width:14px; height:14px; border-radius:50%;
+    background:#ff5c7c; color:#0a0e14; font-size:9px; font-weight:bold; display:flex; align-items:center; justify-content:center; }
+  .slotRow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:6px; }
+  .slotChip{ display:flex; align-items:center; gap:5px; background:#101623; border:1px solid #2a3348;
+    border-radius:8px; padding:4px 6px; font-size:11px; }
+  .slotChip .keyBtn{ pointer-events:all; cursor:pointer; background:#0a0e14; border:1px solid #3a4560; color:var(--accent);
+    border-radius:5px; padding:2px 7px; font-size:11px; min-width:20px; text-align:center; text-transform:uppercase; }
+  .slotChip .keyBtn.listening{ background:var(--accent); color:#031017; }
+  .slotChip .keyBtn.unbound{ border-color:var(--accent2); color:var(--accent2); }
+  .slotChip.ult{ border-color:var(--gold); } .slotChip.ult .keyBtn{ border-color:var(--gold); color:var(--gold); }
+  #abilityHint{ font-size:11px; color:var(--dim); margin-bottom:8px; }
+
+  /* ---- játék közbeni képességsáv (dinamikus) ---- */
+  #ultBtn{ position:absolute; right:calc(10px*var(--ui-scale)); right:max(calc(10px*var(--ui-scale)),env(safe-area-inset-right)); bottom:calc(80px*var(--ui-scale)); z-index:6;
+    width:calc(54px*var(--ui-scale)); height:calc(54px*var(--ui-scale)); border-radius:50%; border:2px solid #2a3348; background:rgba(18,24,38,0.9);
+    color:var(--gold); font-size:calc(22px*var(--ui-scale)); display:flex; align-items:center; justify-content:center; cursor:pointer;
+    opacity:0.5; overflow:hidden; }
+  #ultBtn.ready{ opacity:1; border-color:var(--gold); box-shadow:0 0 16px rgba(255,209,102,0.5); }
+  #ultBtn .ultFill{ position:absolute; left:0; right:0; bottom:0; background:rgba(255,209,102,0.28); height:0%; }
+  #ultBtn span{ position:relative; z-index:1; }
+  #buffTray{ position:absolute; left:50%; transform:translateX(-50%); bottom:calc(62px*var(--ui-scale)); z-index:5;
+    display:flex; gap:calc(5px*var(--ui-scale)); pointer-events:none; }
+  #buffTray .buff{ font-size:calc(12px*var(--ui-scale)); background:rgba(18,24,38,0.85); border:1px solid #3a4560; border-radius:6px; padding:1px 5px; }
+
+  /* nagyobb tappintható elemek érintőn — de arányosan a mért játéktérhez, ne fixen */
+  @media (pointer:coarse){
+    .abIcon{ width:calc(46px*var(--ui-scale)); height:calc(46px*var(--ui-scale)); font-size:calc(19px*var(--ui-scale)); }
+    .abIcon .key{ display:none; }
+    #pauseBtn{ width:calc(46px*var(--ui-scale)); height:calc(46px*var(--ui-scale)); font-size:calc(21px*var(--ui-scale)); }
+  }
+</style>
+</head>
+<body>
+<div id="gameWrap">
+  <canvas id="game"></canvas>
+
+  <button id="pauseBtn" class="hidden" aria-label="Szünet">⏸</button>
+
+  <div id="hud" class="hidden">
+    <div class="panel" id="hpWrap">
+      <div id="hpLabel">ÉLET</div>
+      <div id="hpBarBg"><div id="hpBarFill"></div></div>
+      <div id="xpWrap"><div id="xpBarBg"><div id="xpBarFill"></div></div><div id="lvlLabel">SZINT 1</div></div>
+    </div>
+    <div class="panel" id="waveInfo">
+      <div id="waveTitle">HULLÁM</div>
+      <div id="waveNum">1</div>
+      <div id="enemyCount">0 ellenfél</div>
+      <div id="modeTag"></div>
+    </div>
+  </div>
+
+  <div id="abilityBar" class="hidden"></div>
+  <div id="buffTray" class="hidden"></div>
+  <button id="ultBtn" class="hidden"><div class="ultFill"></div><span>💥</span></button>
+
+  <div id="levelUpBanner" class="hidden">
+    <div class="lu1">SZINTLÉPÉS</div>
+    <div class="lu2" id="luText"></div>
+    <div class="lu3" id="luSub"></div>
+  </div>
+
+  <div id="startScreen" class="overlay">
+    <h1 class="title">A KILENC PECSÉT</h1>
+    <div class="subtitle">
+      A várost sötét szörnyhadsereg szállta meg. Válassz harcost, állítsd össze képességeidet,
+      és törd fel a pecséteket. Minél többet játszol, annál több harcos és képesség oldódik fel.
+    </div>
+    <div id="profileBar">
+      <div>Profil <b id="profLvl">1</b></div>
+      <div id="profXpBg"><div id="profXpFill"></div></div>
+      <div><b id="profXpTxt">0</b> össz-XP</div>
+    </div>
+    <div class="charCustom">
+      <canvas id="previewCanvas" width="110" height="110"></canvas>
+      <div>
+        <input id="nameInput" type="text" placeholder="Karakter neve" maxlength="14" value="Hős">
+        <div class="colorRow" id="colorRow" style="margin-top:14px;"></div>
+        <div class="headRow" id="headRow" style="margin-top:12px;"></div>
+      </div>
+    </div>
+    <div class="pickLabel">HARCOS KIVÁLASZTÁSA</div>
+    <div class="classRow" id="classRow"></div>
+    <div class="pickLabel">KÉPESSÉGEK — VÁLASSZ MAX 5-öT</div>
+    <div class="loadoutWrap">
+      <div class="abilityGrid" id="abilityGrid"></div>
+      <div class="slotRow" id="slotRow"></div>
+      <div id="abilityHint"></div>
+    </div>
+    <div class="pickLabel">NEHÉZSÉGI SZINT</div>
+    <div class="diffRow" id="diffRow"></div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+      <button class="bigBtn" id="startBtn">KAMPÁNY</button>
+      <button class="bigBtn gold" id="storyModeBtn">SZTORI MÓD</button>
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+      <button class="bigBtn ghost sndBtn sndSfxBtn"></button>
+      <button class="bigBtn ghost sndBtn sndMusBtn"></button>
+      <button class="bigBtn ghost hidden" id="installBtn">📲 TELEPÍTÉS</button>
+      <button class="bigBtn ghost" id="exportSaveBtn">📤 Mentés kimásolása</button>
+      <button class="bigBtn ghost" id="importSaveBtn">📥 Mentés beillesztése</button>
+      <button class="bigBtn ghost" id="accountBtn">🔑 Fiók</button>
+    </div>
+    <div id="accountStatus" style="font-size:11px; color:var(--dim); margin-top:2px;"></div>
+    <div class="controlsHint" id="controlsHint"></div>
+  </div>
+
+  <div id="mapScreen" class="overlay hidden">
+    <h1 class="title">A KILENC PECSÉT</h1>
+    <div class="subtitle">Válaszd ki a fejezetet. Minden pecsét külön pálya és boss — a legyőzött pecsét feloldja a következőt. A kaszt- és képesség-beállításod a KAMPÁNY képernyőn állítható.</div>
+    <div class="classRow" id="mapRow"></div>
+    <button class="bigBtn ghost" id="mapBackBtn">VISSZA</button>
+  </div>
+
+  <div id="storyIntro" class="overlay hidden">
+    <h1 class="title" id="storyTitle"></h1>
+    <div class="storyBox" id="storyText"></div>
+    <button class="bigBtn" id="storyStartBtn">HARC KEZDÉSE</button>
+  </div>
+
+  <div id="pauseScreen" class="overlay hidden">
+    <h1 class="title">SZÜNET</h1>
+    <div class="storyBox">A játék meg van állítva. Vedd vissza a levegőt, aztán folytasd.</div>
+    <button class="bigBtn" id="resumeBtn">FOLYTATÁS</button>
+    <button class="bigBtn ghost" id="pauseRestartBtn">ÚJRAKEZDÉS</button>
+    <button class="bigBtn ghost" id="pauseMenuBtn">FŐMENÜ</button>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+      <button class="bigBtn ghost sndBtn sndSfxBtn"></button>
+      <button class="bigBtn ghost sndBtn sndMusBtn"></button>
+    </div>
+  </div>
+
+  <div id="bossIntro" class="overlay hidden">
+    <h1 class="title" id="bossIntroTitle" style="color:var(--accent2); -webkit-text-fill-color:var(--accent2);">A GONOSZ ÁRNYÉK</h1>
+    <div class="storyBox" id="bossIntroText"></div>
+    <button class="bigBtn red" id="bossStartBtn">HARC KEZDÉSE</button>
+  </div>
+
+  <div id="winScreen" class="overlay hidden">
+    <h1 class="title" style="color:var(--gold); -webkit-text-fill-color:var(--gold);">GYŐZELEM</h1>
+    <div class="storyBox" id="winText"></div>
+    <button class="bigBtn gold" id="endlessBtn">VÉGTELEN MÓD FOLYTATÁSA</button>
+    <button class="bigBtn" id="restartBtnWin">ÚJ JÁTÉK</button>
+  </div>
+
+  <div id="deathScreen" class="overlay hidden">
+    <h1 class="title" style="color:var(--accent2); -webkit-text-fill-color:var(--accent2);">ELBUKTÁL</h1>
+    <div class="storyBox" id="deathText"></div>
+    <button class="bigBtn" id="restartBtnDeath">ÚJRAPRÓBÁLOM</button>
+    <button class="bigBtn ghost" id="deathMenuBtn">FŐMENÜ</button>
+  </div>
+
+  <div id="authScreen" class="overlay hidden">
+    <h1 class="title" style="font-size:32px;">FIÓK</h1>
+    <div class="subtitle" id="authInfoText">Jelentkezz be, hogy a haladásod (szint, feloldott hősök/pecsétek) bármelyik eszközödről elérhető legyen.</div>
+    <div id="authLoggedOutBox">
+      <input id="authUser" type="text" placeholder="Felhasználónév" autocomplete="username" style="display:block; margin:8px auto; padding:9px 14px; border-radius:8px; border:1px solid #2a3348; background:#101623; color:var(--text); width:240px; pointer-events:all;">
+      <input id="authPass" type="password" placeholder="Jelszó (min. 6 karakter)" style="display:block; margin:8px auto; padding:9px 14px; border-radius:8px; border:1px solid #2a3348; background:#101623; color:var(--text); width:240px; pointer-events:all;">
+      <div>
+        <button class="bigBtn" id="authLoginBtn">Bejelentkezés</button>
+        <button class="bigBtn gold" id="authRegisterBtn">Regisztráció</button>
+      </div>
+      <div id="authErrorText" style="color:var(--accent2); font-size:12px; min-height:16px; margin-top:6px;"></div>
+    </div>
+    <div id="authLoggedInBox" class="hidden">
+      <div class="storyBox" id="authLoggedInText"></div>
+      <button class="bigBtn ghost" id="authLogoutBtn">Kijelentkezés</button>
+    </div>
+    <button class="bigBtn ghost" id="authBackBtn" style="margin-top:14px;">Vissza</button>
+  </div>
+</div>
+
+<!-- Firebase — fiók + felhő-mentés (a saját Firebase-projekt adataival kell kitölteni lent a fő scriptben) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* =========================================================
+   FIÓK-RENDSZER BEÁLLÍTÁSA
+   Ide másold be a saját Firebase-projeked adatait (Firebase
+   Console → Project settings → General → "Your apps" → Config).
+   Amíg nincs kitöltve, a fiók-funkciók automatikusan ki vannak
+   kapcsolva, és a játék a megszokott, csak-helyi mentéssel megy.
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "IDE_MÁSOLD_BE",
+  authDomain: "IDE_MÁSOLD_BE",
+  projectId: "IDE_MÁSOLD_BE",
+  storageBucket: "IDE_MÁSOLD_BE",
+  messagingSenderId: "IDE_MÁSOLD_BE",
+  appId: "IDE_MÁSOLD_BE",
+};
+let fbApp=null, fbAuth=null, fbDb=null, fbUser=null, FIREBASE_READY=false;
+try{
+  if(firebaseConfig.apiKey && firebaseConfig.apiKey!=="IDE_MÁSOLD_BE"){
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    FIREBASE_READY = true;
+  }
+}catch(e){ console.warn('Firebase nem inicializálható:', e); FIREBASE_READY=false; }
+</script>
+<script>
+/* =========================================================
+   A KILENC PECSÉT — felülnézetes akció-túlélő játék
+   Érintős irányítás (twin-stick), rajzolt fejek, ellenfél-AI,
+   nehézségi szintek és szüneteltetés támogatással.
+   ========================================================= */
+
+// ---- PWA: telepíthetőség (asztali ikon/ablak, telefonon "Kezdőképernyőhöz adás") ----
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installBtn');
+  if(btn) btn.classList.remove('hidden');
+});
+function tryInstallApp(){
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.finally(()=>{
+    deferredInstallPrompt = null;
+    const btn = document.getElementById('installBtn');
+    if(btn) btn.classList.add('hidden');
+  });
+}
+window.addEventListener('appinstalled', ()=>{
+  const btn = document.getElementById('installBtn');
+  if(btn) btn.classList.add('hidden');
+});
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const gameWrapEl = document.getElementById('gameWrap');
+
+// Megméri a ténylegesen elérhető képernyőt, és PONTOSAN erre a pixelméretre állítja
+// a gameWrap-et és a canvas-t (nem bízva a vh/dvh CSS-egységekben, amik telefononként
+// eltérően számolják a böngésző saját sávjait) — így a tartalom sosem lóghat ki, és
+// sosem marad láthatatlan rész a képernyő szélén túl. A HUD/gombok mérete is ehhez a
+// mért területhez igazodik (--ui-scale), hogy kis telefonon ne egyen meg sok helyet.
+let uiScale = 1;
+function computeUiScale(){
+  const shortSide = Math.min(window.innerWidth, window.innerHeight);
+  uiScale = clamp(shortSide/760, 0.58, 1.15);
+  document.documentElement.style.setProperty('--ui-scale', uiScale.toFixed(3));
+}
+let safeTop = 92, safeBottom = 150;
+function updateSafeMargins(){
+  try{
+    const hud = document.getElementById('hud');
+    if(hud && !hud.classList.contains('hidden')){
+      const r = hud.getBoundingClientRect();
+      if(r.height>4) safeTop = Math.round(r.height + 16*uiScale);
+    }
+    let bottom = Math.round(36*uiScale);
+    const bar = document.getElementById('abilityBar');
+    if(bar && !bar.classList.contains('hidden')){
+      const r = bar.getBoundingClientRect();
+      if(r.height>4) bottom = Math.max(bottom, Math.round(window.innerHeight - r.top + 16*uiScale));
+    }
+    if(typeof input!=='undefined' && input.touchMode) bottom = Math.max(bottom, Math.round(130*uiScale));
+    safeBottom = bottom;
+  }catch(e){}
+}
+function resize(){
+  const vv = window.visualViewport;
+  const w = vv ? Math.round(vv.width) : window.innerWidth;
+  const h = vv ? Math.round(vv.height) : window.innerHeight;
+
+  document.documentElement.style.width = w+'px';
+  document.documentElement.style.height = h+'px';
+  document.body.style.width = w+'px';
+  document.body.style.height = h+'px';
+  if(gameWrapEl){ gameWrapEl.style.width = w+'px'; gameWrapEl.style.height = h+'px'; }
+  canvas.style.width = w+'px';
+  canvas.style.height = h+'px';
+  canvas.width = w;
+  canvas.height = h;
+
+  window.scrollTo(0,0);
+  computeUiScale();
+  updateSafeMargins();
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=>setTimeout(resize, 300));
+if(window.visualViewport){ window.visualViewport.addEventListener('resize', resize); }
+resize();
+
+const PI2 = Math.PI*2;
+function dist(ax,ay,bx,by){ return Math.hypot(ax-bx, ay-by); }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+// forgatott lokális rajzoláshoz: (0,0) a középpont, +x = "előre" (facing irány)
+function withRot(g,x,y,a,fn){ g.save(); g.translate(x,y); g.rotate(a); fn(); g.restore(); }
+// lekerekített téglalap útvonal
+function rr(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r);
+  g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function hexToRgb(h){ h=h.replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join('');
+  const n=parseInt(h,16); return [n>>16&255, n>>8&255, n&255]; }
+function shade(hex,f){ let [r,g,b]=hexToRgb(hex);
+  if(f>=0){ r+=(255-r)*f; g+=(255-g)*f; b+=(255-b)*f; } else { r*=(1+f); g*=(1+f); b*=(1+f); }
+  return `rgb(${r|0},${g|0},${b|0})`; }
+
+// ---------- Konfiguráció ----------
+const COLORS = ['#6ee7ff', '#ff5c7c', '#ffd166', '#8b5cf6', '#4ade80', '#f97316'];
+let chosenColor = COLORS[0];
+
+const PLAYER_HEADS = [
+  { id:'commando', label:'Kommandós' },
+  { id:'gasmask',  label:'Gázmaszk'  },
+  { id:'cyber',    label:'Kiber'     },
+  { id:'ninja',    label:'Árnyék'    },
+  { id:'spartan',  label:'Spártai'   },
+];
+let chosenHead = 'commando';
+
+// hp/dmg/speed = ellenfél-szorzók; fireRate = kisebb => gyorsabb tüzelés;
+// count = spawn-mennyiség; ai = 0..1 taktikai okosság (célzás-előretartás, kitérés, cikázás)
+const DIFFICULTIES = {
+  easy:      { key:'easy',      label:'Könnyű',   desc:'lazább kezdés', hp:0.65, dmg:0.55, speed:0.88, fireRate:1.45, count:0.75, ai:0.35, col:'#4ade80' },
+  normal:    { key:'normal',    label:'Normál',   desc:'kiegyensúlyozott', hp:0.95, dmg:0.9,  speed:0.98, fireRate:1.05, count:0.95, ai:0.6,  col:'#6ee7ff' },
+  hard:      { key:'hard',      label:'Nehéz',    desc:'okos ellenfelek', hp:1.3,  dmg:1.4,  speed:1.1,  fireRate:0.8,  count:1.15, ai:0.85, col:'#ffd166' },
+  nightmare: { key:'nightmare', label:'Rémálom',  desc:'kíméletlen', hp:1.75, dmg:1.9,  speed:1.22, fireRate:0.62, count:1.4,  ai:1.05, col:'#ff5c7c' },
+  hellish:   { key:'hellish',   label:'Pokoli',   desc:'csak a legelszántabbaknak', hp:2.3, dmg:2.5, speed:1.32, fireRate:0.5,  count:1.7,  ai:1.25, col:'#c0304a' },
+  apocalyptic:{ key:'apocalyptic', label:'Apokaliptikus', desc:'gyakorlatilag igazságtalan — ez a cél', hp:3.0, dmg:3.2, speed:1.42, fireRate:0.4, count:2.0, ai:1.4, col:'#7a1030' },
+};
+let chosenDifficulty = 'normal';
+
+/* =========================================================
+   PROFIL (localStorage) — meta-fejlődés, feloldások
+   ========================================================= */
+const PROFILE_KEY = 'kilencpecset_profile_v4';
+let profile = { xp:0 };
+try{ const s=localStorage.getItem(PROFILE_KEY); if(s) profile = JSON.parse(s)||{xp:0}; }catch(e){}
+// story-haladás — régi mentésnél hiányozhat, ezért mindig védve olvassuk
+profile.storyProgress = profile.storyProgress || 0;   // legmagasabb feloldott fejezet-index
+profile.storyDone = profile.storyDone || [];           // teljesített fejezet-id-k
+const PROFILE_STEP = 260;
+function profileLevel(){ return 1 + Math.floor((profile.xp||0)/PROFILE_STEP); }
+function saveProfile(){ try{ localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }catch(e){} if(typeof fbUser!=='undefined' && fbUser) pushCloudSave(); }
+function awardXp(a){ profile.xp = (profile.xp||0) + Math.max(0,Math.round(a)); saveProfile(); }
+
+/* =========================================================
+   HŐS-HASZNÁLAT + NAPI AUTOMATIKUS FINOMHANGOLÁS (localStorage)
+   Ezen az eszközön/böngészőn belül méri, melyik hőssel játszol
+   a legtöbbet, és naponta egyszer apró, fokozatos buff/nerf
+   szorzót állít be — a túl népszerű hős kicsit gyengül,
+   az alig használt kicsit erősödik. A drasztikus kilengés ellen
+   a szorzó szűk sávban van korlátozva.
+   ========================================================= */
+const HERO_STATS_KEY = 'kilencpecset_herostats_v1';
+let heroStats = { plays:{}, mult:{}, abilityUses:{}, abilityMult:{}, lastCheck:'' };
+try{ const s=localStorage.getItem(HERO_STATS_KEY); if(s) heroStats = Object.assign({plays:{},mult:{},abilityUses:{},abilityMult:{},lastCheck:''}, JSON.parse(s)); }catch(e){}
+function saveHeroStats(){ try{ localStorage.setItem(HERO_STATS_KEY, JSON.stringify(heroStats)); }catch(e){} if(typeof fbUser!=='undefined' && fbUser) pushCloudSave(); }
+
+/* =========================================================
+   MENTÉS-KÓD — hordozható másolat a haladásodról (profil-szint,
+   feloldott hősök/pecsétek alapja, egyéni finomhangolás), amit
+   átvihetsz egy másik eszközre. Nem automatikus/felhős szinkron —
+   neked kell átmásolnod a kódot —, de nem igényel se szervert, se fiókot.
+   ========================================================= */
+function buildSaveCode(){
+  try{
+    const payload = { v:1, profile, heroStats };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  }catch(e){ return null; }
+}
+function applySaveCode(code){
+  try{
+    const payload = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    if(!payload || typeof payload!=='object') throw new Error('rossz formátum');
+    if(payload.profile) { profile = payload.profile; saveProfile(); }
+    if(payload.heroStats) { heroStats = Object.assign({plays:{},mult:{},abilityUses:{},abilityMult:{},lastCheck:''}, payload.heroStats); saveHeroStats(); }
+    return true;
+  }catch(e){ return false; }
+}
+document.getElementById('exportSaveBtn').addEventListener('click', ()=>{
+  const code = buildSaveCode();
+  if(!code){ alert('Nem sikerült elkészíteni a mentés-kódot.'); return; }
+  window.prompt('Másold ki ezt a kódot (Ctrl+C / hosszan nyomva "Másolás"), és mentsd el valahova (pl. jegyzet, magadnak küldött üzenet) — ezt illeszd be a másik eszközön:', code);
+});
+document.getElementById('importSaveBtn').addEventListener('click', ()=>{
+  const code = window.prompt('Illeszd be ide a másik eszközön kapott mentés-kódot:', '');
+  if(!code) return;
+  if(applySaveCode(code)){
+    alert('Sikeres betöltés! Az oldal újratöltődik.');
+    location.reload();
+  } else {
+    alert('Ez a kód nem érvényes vagy sérült — ellenőrizd, hogy a teljes kódot bemásoltad-e.');
+  }
+});
+
+/* =========================================================
+   FIÓK + FELHŐ-MENTÉS (Firebase Auth + Firestore)
+   Csak akkor aktív, ha ki van töltve a firebaseConfig a fájl elején.
+   Bejelentkezéskor letölti a felhőből a mentést (ha van), különben
+   feltölti a jelenlegi helyi mentést. Utána minden helyi mentés
+   (profil, hős-statisztika) automatikusan a felhőbe is megy.
+   ========================================================= */
+async function pushCloudSave(){
+  if(!FIREBASE_READY || !fbUser || !fbDb) return;
+  try{ await fbDb.collection('saves').doc(fbUser.uid).set({ profile, heroStats, updatedAt: Date.now() }); }
+  catch(e){ console.warn('Felhő mentés sikertelen:', e); }
+}
+async function pullCloudSave(){
+  if(!FIREBASE_READY || !fbUser || !fbDb) return;
+  try{
+    const doc = await fbDb.collection('saves').doc(fbUser.uid).get();
+    if(doc.exists){
+      const data = doc.data();
+      if(data.profile){ profile = data.profile; saveProfile(); }
+      if(data.heroStats){ heroStats = Object.assign({plays:{},mult:{},abilityUses:{},abilityMult:{},lastCheck:''}, data.heroStats); saveHeroStats(); }
+    } else {
+      await pushCloudSave();   // első bejelentkezés: a jelenlegi helyi mentés lesz a kiindulópont
+    }
+  }catch(e){ console.warn('Felhő betöltés sikertelen:', e); }
+}
+function displayUsername(){
+  if(!fbUser || !fbUser.email) return '';
+  return fbUser.email.split('@')[0];
+}
+// Ha ezekkel a felhasználónevekkel jelentkezik be valaki, annak minden hős/pecsét/fejezet
+// azonnal elérhető — így nem kell külön "teszt" verziót fenntartani.
+const ADMIN_USERNAMES = ['davidlipcs1234'];
+function isAdminUser(){
+  return !!(FIREBASE_READY && fbUser && ADMIN_USERNAMES.includes(displayUsername().toLowerCase()));
+}
+function updateAccountUI(){
+  const statusEl = document.getElementById('accountStatus');
+  const loggedOutBox = document.getElementById('authLoggedOutBox');
+  const loggedInBox = document.getElementById('authLoggedInBox');
+  if(!FIREBASE_READY){
+    if(statusEl) statusEl.textContent = '';
+    return;
+  }
+  if(fbUser){
+    if(statusEl) statusEl.textContent = 'Bejelentkezve: ' + displayUsername();
+    if(loggedOutBox) loggedOutBox.classList.add('hidden');
+    if(loggedInBox){ loggedInBox.classList.remove('hidden');
+      document.getElementById('authLoggedInText').textContent = `Bejelentkezve mint ${displayUsername()}. A haladásod automatikusan szinkronizálódik.`; }
+  } else {
+    if(statusEl) statusEl.textContent = '';
+    if(loggedOutBox) loggedOutBox.classList.remove('hidden');
+    if(loggedInBox) loggedInBox.classList.add('hidden');
+  }
+}
+if(FIREBASE_READY){
+  fbAuth.onAuthStateChanged(async (user)=>{
+    fbUser = user;
+    if(user) await pullCloudSave();
+    updateAccountUI();
+    // ha admin-felhasználóként jelentkezett be (vagy kijelentkezett), frissítsük azonnal
+    // a zárolás-jelzéseket is, ne csak új képernyőváltáskor
+    if(typeof renderClassCards==='function') renderClassCards();
+    if(typeof renderMapCards==='function') renderMapCards();
+    if(typeof buildLoadoutUI==='function') buildLoadoutUI();
+  });
+}
+const accountBtn = document.getElementById('accountBtn');
+if(!FIREBASE_READY) accountBtn.title = 'A fiók-funkció még nincs beállítva ebben a másolatban.';
+accountBtn.addEventListener('click', ()=>{
+  document.getElementById('authErrorText').textContent = FIREBASE_READY ? '' : 'A fiók-funkció még nincs beállítva ebben a másolatban (firebaseConfig üres).';
+  showScreen('authScreen'); updateAccountUI();
+});
+document.getElementById('authBackBtn').addEventListener('click', ()=> showScreen('startScreen'));
+// A Firebase Auth technikailag e-mail-formátumot kér — a felhasználó ebből semmit sem lát,
+// a háttérben a megadott felhasználónévből csinálunk neki egy érvényes, egyedi "álnevet".
+function usernameToLoginId(u){
+  const clean = (u||'').trim().toLowerCase().replace(/[^a-z0-9_.-]/g,'');
+  if(!clean) return null;
+  return clean + '@kilencpecset-jatek.local';
+}
+document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('authErrorText'); errEl.textContent='';
+  if(!FIREBASE_READY){ errEl.textContent='A fiók-funkció még nincs beállítva.'; return; }
+  const loginId = usernameToLoginId(document.getElementById('authUser').value);
+  const pass = document.getElementById('authPass').value;
+  if(!loginId){ errEl.textContent='Adj meg egy felhasználónevet.'; return; }
+  try{ await fbAuth.signInWithEmailAndPassword(loginId, pass); showScreen('startScreen'); }
+  catch(e){ errEl.textContent = 'Nem sikerült bejelentkezni: ' + (e.message||e.code||'ismeretlen hiba'); }
+});
+document.getElementById('authRegisterBtn').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('authErrorText'); errEl.textContent='';
+  if(!FIREBASE_READY){ errEl.textContent='A fiók-funkció még nincs beállítva.'; return; }
+  const loginId = usernameToLoginId(document.getElementById('authUser').value);
+  const pass = document.getElementById('authPass').value;
+  if(!loginId){ errEl.textContent='Adj meg egy felhasználónevet.'; return; }
+  try{ await fbAuth.createUserWithEmailAndPassword(loginId, pass); showScreen('startScreen'); }
+  catch(e){ errEl.textContent = 'Nem sikerült regisztrálni: ' + (e.message||e.code||'ismeretlen hiba'); }
+});
+document.getElementById('authLogoutBtn').addEventListener('click', ()=>{
+  if(FIREBASE_READY) fbAuth.signOut();
+  updateAccountUI();
+});
+
+function recordHeroPlay(clsId){
+  heroStats.plays[clsId] = (heroStats.plays[clsId]||0) + 1;
+  saveHeroStats();
+}
+function heroBalanceMult(clsId){
+  const m = heroStats.mult[clsId];
+  return { hp: (m&&m.hp) || 1, dmg: (m&&m.dmg) || 1 };
+}
+// -- Képesség-szintű követés: melyiket használod a legtöbbet ténylegesen bevetve --
+function recordAbilityUse(id){
+  heroStats.abilityUses[id] = (heroStats.abilityUses[id]||0) + 1;
+  saveHeroStats();
+}
+function abilityBalanceMult(id){
+  const m = heroStats.abilityMult[id];
+  return (typeof m==='number') ? m : 1;
+}
+function runDailyAbilityBalanceCheck(){
+  const ids = Object.keys(ABILITIES);
+  const uses = ids.map(id=>heroStats.abilityUses[id]||0);
+  const total = uses.reduce((a,b)=>a+b,0);
+  if(total < ids.length*3) return;   // kevés adat, ne nyúljunk hozzá
+  const avgShare = 1/ids.length;
+  ids.forEach((id,i)=>{
+    const share = uses[i]/total;
+    let cur = heroStats.abilityMult[id]; if(typeof cur!=='number') cur = 1;
+    let step = 0;
+    if(share > avgShare*2) step = -0.03;             // amit sokkal többet használsz, mint a többit -> gyengül
+    else if(share < avgShare*0.35 && total>=ids.length*6) step = 0.02;  // amit szinte sosem -> kicsit erősödik
+    if(step!==0) heroStats.abilityMult[id] = clamp(cur+step, 0.6, 1.1);
+  });
+}
+function runDailyHeroBalanceCheck(){
+  const today = new Date().toISOString().slice(0,10);
+  if(heroStats.lastCheck === today) return;   // ma már megtörtént
+  heroStats.lastCheck = today;
+  // a "sealed" (pecsételt) hősöket a finomhangolás sosem érinti — sem a statisztikában, sem a szorzóban
+  const ids = Object.keys(CLASSES).filter(id=>!CLASSES[id].sealed);
+  const plays = ids.map(id=>heroStats.plays[id]||0);
+  const total = plays.reduce((a,b)=>a+b,0);
+  // csak akkor nyúlunk hozzá, ha van elég adat ahhoz, hogy ne egy-két meccsen múljon
+  if(total >= ids.length*4){
+    const avgShare = 1/ids.length;
+    ids.forEach((id,i)=>{
+      const share = plays[i]/total;
+      const cur = heroStats.mult[id] || {hp:1,dmg:1};
+      let step = 0;
+      if(share > avgShare*1.5) step = -0.02;        // kiugróan népszerű -> apró nerf
+      else if(share < avgShare*0.5 && total>=ids.length*8) step = 0.02;  // alig használt -> apró buff
+      if(step!==0){
+        cur.hp  = clamp(cur.hp  + step, 0.85, 1.15);
+        cur.dmg = clamp(cur.dmg + step, 0.85, 1.15);
+        heroStats.mult[id] = cur;
+      }
+    });
+  }
+  runDailyAbilityBalanceCheck();
+  saveHeroStats();
+}
+
+/* =========================================================
+   HANG — Web Audio API, külső fájlok NÉLKÜL (szintetizált)
+   A böngésző csak felhasználói gesztus után enged hangot,
+   ezért az AudioContext az első pointerdown/keydown-nál jön létre.
+   ========================================================= */
+const SND = {
+  ctx:null, master:null, sfxGain:null, musGain:null, noiseBuf:null,
+  musVol:0.5,                            // zene alap-hangerő (szünetben ennek töredéke)
+  sfxOn: profile.sndSfx !== false,       // régi mentésben nincs mező -> alapból BE
+  musicOn: profile.sndMusic !== false,
+  last:{},                               // SFX rate-limit (kulcs -> utolsó lejátszás ms)
+  mus:{ timer:null, step:0, bar:0, nextT:0, theme:'default', pending:false },
+};
+function sndInit(){
+  if(SND.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return;
+  SND.ctx = new AC();
+  // kompresszor a kimeneten: így a master jóval hangosabb lehet torzítás/vágás nélkül
+  SND.comp = SND.ctx.createDynamicsCompressor();
+  SND.comp.threshold.value = -18; SND.comp.knee.value = 20; SND.comp.ratio.value = 6;
+  SND.comp.attack.value = 0.003; SND.comp.release.value = 0.25;
+  SND.comp.connect(SND.ctx.destination);
+  SND.master = SND.ctx.createGain(); SND.master.gain.value = 1.7; SND.master.connect(SND.comp);
+  SND.sfxGain = SND.ctx.createGain(); SND.sfxGain.connect(SND.master);
+  SND.musGain = SND.ctx.createGain(); SND.musGain.gain.value = SND.musVol; SND.musGain.connect(SND.master);
+  // közös zaj-buffer (robbanás, találat)
+  const len = (SND.ctx.sampleRate*0.5)|0, buf = SND.ctx.createBuffer(1,len,SND.ctx.sampleRate), d = buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+  SND.noiseBuf = buf;
+  if(SND.mus.pending){ SND.mus.pending = false; startMusic(SND.mus.theme); }
+}
+function sndUnlock(){ sndInit(); if(SND.ctx && SND.ctx.state==='suspended') SND.ctx.resume(); }
+document.addEventListener('pointerdown', sndUnlock, true);
+document.addEventListener('keydown', sndUnlock, true);
+
+// rövid hangjegy/effekt: f->f2 csúszó frekvencia, exponenciális burkológörbe
+function tone(o){
+  if(!SND.ctx || !SND.sfxOn) return;
+  const c = SND.ctx, t = c.currentTime + (o.at||0);
+  const osc = c.createOscillator(), g = c.createGain();
+  osc.type = o.type || 'square';
+  osc.frequency.setValueAtTime(o.f, t);
+  if(o.f2) osc.frequency.exponentialRampToValueAtTime(Math.max(1,o.f2), t + (o.dur||0.15));
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(o.v||0.15, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (o.dur||0.15));
+  osc.connect(g); g.connect(SND.sfxGain);
+  osc.start(t); osc.stop(t + (o.dur||0.15) + 0.05);
+}
+// szűrt zaj-lökés (ütés, robbanás)
+function noiseHit(o){
+  if(!SND.ctx || !SND.sfxOn) return;
+  const c = SND.ctx, t = c.currentTime + (o.at||0);
+  const src = c.createBufferSource(); src.buffer = SND.noiseBuf; src.loop = true;
+  const flt = c.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = o.fq||1000;
+  const g = c.createGain();
+  g.gain.setValueAtTime(o.v||0.15, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (o.dur||0.2));
+  src.connect(flt); flt.connect(g); g.connect(SND.sfxGain);
+  src.start(t); src.stop(t + (o.dur||0.2) + 0.05);
+}
+// rate-limit: ugyanaz az effekt ne szóljon sűrűbben, mint ms
+function sndReady(key, ms){
+  if(!SND.ctx || !SND.sfxOn) return false;
+  const t = performance.now();
+  if(SND.last[key] && t - SND.last[key] < ms) return false;
+  SND.last[key] = t; return true;
+}
+const SFX = {
+  shoot(cls){ if(!sndReady('shoot',45)) return;
+    const f = {tank:150,sniper:620,berserker:210,mage:460,assassin:330,support:360}[cls]||260;
+    tone({f, f2:f*0.5, type:(cls==='mage'||cls==='support')?'triangle':'square', dur:0.07, v:0.08}); },
+  eshoot(){ if(!sndReady('eshoot',140)) return; tone({f:190,f2:115,type:'sawtooth',dur:0.09,v:0.05}); },
+  bossShoot(){ if(!sndReady('bshoot',220)) return; tone({f:140,f2:75,type:'sawtooth',dur:0.16,v:0.09}); },
+  hit(){ if(!sndReady('hit',55)) return; noiseHit({dur:0.05,v:0.06,fq:1800}); },
+  enemyDie(){ if(!sndReady('die',70)) return; tone({f:320,f2:55,type:'sawtooth',dur:0.2,v:0.09}); noiseHit({dur:0.12,v:0.05,fq:900}); },
+  explosion(big){ if(!sndReady('expl',90)) return;
+    noiseHit({dur:big?0.55:0.35, v:big?0.28:0.18, fq:420}); tone({f:95,f2:28,type:'sine',dur:big?0.5:0.3,v:0.22}); },
+  hurt(){ if(!sndReady('hurt',180)) return; tone({f:240,f2:90,type:'square',dur:0.14,v:0.15}); },
+  orb(){ if(!sndReady('orb',70)) return; tone({f:1050,f2:1500,type:'sine',dur:0.07,v:0.045}); },
+  ability(){ if(!sndReady('ab',90)) return; tone({f:480,f2:940,type:'sine',dur:0.12,v:0.11}); },
+  ult(){ tone({f:130,f2:520,type:'sawtooth',dur:0.4,v:0.18}); tone({f:196,f2:780,type:'square',dur:0.4,v:0.09,at:0.05}); },
+  ultReady(){ tone({f:660,type:'sine',dur:0.09,v:0.09}); tone({f:990,type:'sine',dur:0.14,v:0.09,at:0.09}); },
+  levelup(){ [523,659,784,1046].forEach((f,i)=>tone({f,type:'triangle',dur:0.13,v:0.11,at:i*0.09})); },
+  crate(){ tone({f:300,f2:180,type:'square',dur:0.06,v:0.09}); tone({f:900,f2:1400,type:'sine',dur:0.12,v:0.07,at:0.06}); },
+  wave(){ if(!sndReady('wave',900)) return; tone({f:98,type:'sawtooth',dur:0.35,v:0.09}); tone({f:147,type:'sawtooth',dur:0.35,v:0.06,at:0.02}); },
+  boss(){ tone({f:82,type:'sawtooth',dur:0.8,v:0.18}); tone({f:87,type:'sawtooth',dur:0.8,v:0.13,at:0.02}); noiseHit({dur:0.6,v:0.09,fq:250,at:0.1}); },
+  win(){ [392,523,659,784,1046].forEach((f,i)=>tone({f,type:'triangle',dur:0.22,v:0.12,at:i*0.13})); },
+  death(){ [330,262,196,131].forEach((f,i)=>tone({f,type:'sawtooth',dur:0.3,v:0.11,at:i*0.18})); },
+};
+
+/* ---- Generatív háttérzene: fejezetenként saját alaphang + skála ---- */
+const MUSIC_THEMES = {
+  default:{ root:110,  scale:[0,3,5,7,10], arp:[0,2,3,2,null,4,3,2, 0,2,4,2,null,3,2,0] },     // A moll pent.
+  city:   { root:110,  scale:[0,3,5,7,10], arp:[0,2,3,2,null,4,3,2, 0,2,4,2,null,3,2,0] },
+  frost:  { root:98,   scale:[0,2,3,7,10], arp:[4,3,2,3,null,2,0,2, 4,3,2,0,null,2,3,4] },     // G, hidegebb szín
+  flame:  { root:82.4, scale:[0,1,5,7,10], arp:[0,1,0,3,null,4,3,1, 0,1,3,4,null,3,1,0] },     // E fríg, nyersebb
+};
+function semi(s){ return Math.pow(2, s/12); }
+function mnote(f, t, dur, type, v){
+  const c = SND.ctx, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g); g.connect(SND.musGain); o.start(t); o.stop(t+dur+0.1);
+}
+// halk "lábcin" zaj-ütés: kis hangszórón ez viszi el legjobban a ritmust
+function mhat(t, v){
+  const c = SND.ctx; if(!SND.noiseBuf) return;
+  const src = c.createBufferSource(); src.buffer = SND.noiseBuf; src.loop = true;
+  const flt = c.createBiquadFilter(); flt.type = 'highpass'; flt.frequency.value = 5000;
+  const g = c.createGain();
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.05);
+  src.connect(flt); flt.connect(g); g.connect(SND.musGain);
+  src.start(t); src.stop(t+0.1);
+}
+function musScheduleStep(step, t){
+  if(!SND.musicOn) return;
+  const th = MUSIC_THEMES[SND.mus.theme] || MUSIC_THEMES.default;
+  const boss = !!(game && game.boss);
+  // FONTOS: minden szólam a kis hangszórón is hallható tartományban szól
+  // (a 40-110 Hz-es mély szinuszt a telefon/laptop hangszóró elnyeli)
+  // basszus az alaphangon, háromszög-hullámmal (felharmonikusai hallhatóvá teszik)
+  if(step%8===0 || (boss && step%8===4)) mnote(th.root, t, 0.3, 'triangle', 0.3);
+  // pad-hármas egy oktávval feljebb
+  if(step===0){ mnote(th.root*2, t, 1.8, 'sine', 0.07); mnote(th.root*2*semi(th.scale[2]), t, 1.8, 'sine', 0.055);
+    mnote(th.root*2*semi(th.scale[4]), t, 1.8, 'sine', 0.05); }
+  // lábcin offbeat-en (boss alatt sűrűbben)
+  if(step%4===2 || (boss && step%2===0)) mhat(t, 0.05);
+  // dallam-arpeggio minden 2. lépésen, két oktávval az alaphang felett
+  if(step%2===1){
+    const n = th.arp[(SND.mus.bar*8 + ((step/2)|0)) % th.arp.length];
+    if(n!==null && n!==undefined) mnote(th.root*4*semi(th.scale[n%th.scale.length]), t, 0.16, boss?'square':'triangle', 0.09);
+  }
+  if(step===15) SND.mus.bar = (SND.mus.bar+1)%4;
+}
+function musTick(){
+  const c = SND.ctx; if(!c) return;
+  const spb = 60/((game && game.boss)?118:92)/2;   // nyolcad hossza (boss alatt gyorsabb tempó)
+  while(SND.mus.nextT < c.currentTime + 0.35){
+    musScheduleStep(SND.mus.step, SND.mus.nextT);
+    SND.mus.nextT += spb; SND.mus.step = (SND.mus.step+1)%16;
+  }
+}
+function startMusic(themeKey){
+  SND.mus.theme = themeKey || 'default';
+  if(!SND.ctx){ SND.mus.pending = true; return; }        // gesztus előtt: indul, amint van ctx
+  SND.musGain.gain.value = SND.musVol;                   // szünet-lehalkítás visszaállítása (ne ragadjon be)
+  if(SND.mus.timer) return;                              // már szól, csak a téma váltott
+  SND.mus.step = 0; SND.mus.bar = 0; SND.mus.nextT = SND.ctx.currentTime + 0.1;
+  SND.mus.timer = setInterval(musTick, 200);
+}
+function stopMusic(){
+  if(SND.mus.timer){ clearInterval(SND.mus.timer); SND.mus.timer = null; }
+  SND.mus.pending = false;
+}
+
+/* ---- Hang-kapcsolók (menü + szünet, profilba mentve) ---- */
+function applySndToggles(){
+  document.querySelectorAll('.sndSfxBtn').forEach(b=> b.textContent = 'HANGOK: '+(SND.sfxOn?'BE':'KI'));
+  document.querySelectorAll('.sndMusBtn').forEach(b=> b.textContent = 'ZENE: '+(SND.musicOn?'BE':'KI'));
+}
+function toggleSfx(){
+  SND.sfxOn = !SND.sfxOn; profile.sndSfx = SND.sfxOn; saveProfile(); applySndToggles();
+  sndUnlock(); if(SND.sfxOn) tone({f:660,f2:990,type:'sine',dur:0.1,v:0.1});
+}
+function toggleMusic(){
+  SND.musicOn = !SND.musicOn; profile.sndMusic = SND.musicOn; saveProfile(); applySndToggles();
+  sndUnlock();
+}
+
+/* =========================================================
+   AI/KÉPESSÉG SEGÉDFÜGGVÉNYEK
+   ========================================================= */
+function addUltCharge(a){ const p=game&&game.player; if(p&&p.ult) p.ult.charge=Math.min(p.ult.chargeMax,p.ult.charge+a); }
+function aoeDamage(x,y,r,dmg,color){
+  game.enemies.forEach(en=>{ if(dist(en.x,en.y,x,y)<r+en.r){ en.hp-=dmg; en.hitFlash=8; addParticles(en.x,en.y,color||'#fff',3); } });
+  if(game.boss && dist(game.boss.x,game.boss.y,x,y)<r+game.boss.r){ game.boss.hp-=dmg*0.8; game.boss.hitFlash=8; }
+  addUltCharge(dmg*0.35);
+}
+function knockback(x,y,r,force){
+  game.enemies.forEach(en=>{ const d=dist(en.x,en.y,x,y); if(d<r && d>0.01){ const a=Math.atan2(en.y-y,en.x-x); en.x+=Math.cos(a)*force; en.y+=Math.sin(a)*force; } });
+}
+function nearestEnemies(x,y,range,n){
+  return [...game.enemies].filter(en=>dist(en.x,en.y,x,y)<range).sort((a,b)=>dist(a.x,a.y,x,y)-dist(b.x,b.y,x,y)).slice(0,n);
+}
+
+/* =========================================================
+   HARCOSOK (CLASSOK)
+   ========================================================= */
+const CLASSES = {
+  tank:{ label:'Tank', role:'VÉDŐFAL', req:1, col:'#7bd88f', icon:'🛡️',
+    strong:'Rengeteg élet és páncél', weak:'Lassú, alacsony DPS',
+    hp:170, speed:1.9, fireRate:26, bulletDmg:13, bulletSpeed:7, bulletCount:1,
+    armor:0.3, regen:0, critChance:0, lowHpDmg:0, cdScale:1, ult:'fortress',
+    def:['shield','shockwave','heal','turret'] },
+  sniper:{ label:'Sniper', role:'MESTERLÖVÉSZ', req:1, col:'#3ddc97', icon:'🎯',
+    strong:'Óriási sebzés és hatótáv', weak:'Lassú tűz, közelben sebezhető',
+    hp:100, speed:2.2, fireRate:42, bulletDmg:34, bulletSpeed:12, bulletCount:1,
+    armor:0, regen:0, critChance:0.2, lowHpDmg:0, cdScale:1, ult:'precision',
+    def:['railgun','blink','dash','turret'] },
+  berserker:{ label:'Berserker', role:'ROHAMOZÓ', req:1, col:'#ff8a5c', icon:'🪓',
+    strong:'Alacsony HP-n brutális sebzés', weak:'Nincs távolsági fölénye',
+    hp:130, speed:2.55, fireRate:16, bulletDmg:11, bulletSpeed:8, bulletCount:1,
+    armor:-0.1, regen:0, critChance:0.1, lowHpDmg:0.8, cdScale:1, ult:'bloodrage',
+    def:['dash','berserk','shockwave','lifesteal'] },
+  mage:{ label:'Mágus', role:'VARÁZSLÓ', req:2, col:'#8b5cf6', icon:'🔮',
+    strong:'Erős, gyorsan újratöltődő képességek', weak:'Törékeny',
+    hp:90, speed:2.25, fireRate:22, bulletDmg:13, bulletSpeed:8, bulletCount:1,
+    armor:0, regen:0, critChance:0, lowHpDmg:0, cdScale:0.8, ult:'elemental',
+    def:['fireball','meteor','ice','chain','poison'] },
+  assassin:{ label:'Assassin', role:'ORGYILKOS', req:3, col:'#ff5c7c', icon:'🗡️',
+    strong:'Villámgyors, kritikus burst', weak:'Nagyon törékeny',
+    hp:85, speed:2.75, fireRate:15, bulletDmg:12, bulletSpeed:11, bulletCount:1,
+    armor:-0.05, regen:0, critChance:0.28, lowHpDmg:0, cdScale:0.85, ult:'shadowstep',
+    def:['blink','dash','shotgun','lifesteal','cluster'] },
+  support:{ label:'Support', role:'TÁMOGATÓ', req:2, col:'#6ee7ff', icon:'✚',
+    strong:'Gyógyulás, tornyok, kitartás', weak:'Alacsony önsebzés',
+    hp:120, speed:2.2, fireRate:24, bulletDmg:11, bulletSpeed:8, bulletCount:1,
+    armor:0.1, regen:0.04, critChance:0, lowHpDmg:0, cdScale:0.85, ult:'lifeaura',
+    def:['heal','turret','drone','shield','surge'] },
+  necromancer:{ label:'Nekromanta', role:'IDÉZŐ', req:2, col:'#9d5cff', icon:'💀',
+    strong:'Csontváz-szolgák harcolnak helyetted', weak:'Gyenge egyedül, felkészülés kell',
+    hp:105, speed:2.1, fireRate:26, bulletDmg:11, bulletSpeed:8, bulletCount:1,
+    armor:0, regen:0.02, critChance:0, lowHpDmg:0, cdScale:0.9, ult:'undeadlegion',
+    def:['raise','soulbomb','boneward','heal'] },
+  hunter:{ label:'Vadász', role:'CSAPDAÁSZ', req:3, col:'#c9a24a', icon:'🏹',
+    strong:'Csapdák és társ irányítják a csatateret', weak:'Felkészülés nélkül gyenge burst',
+    hp:112, speed:2.35, fireRate:20, bulletDmg:11, bulletSpeed:9, bulletCount:1,
+    armor:0, regen:0, critChance:0.12, lowHpDmg:0, cdScale:0.95, ult:'huntingground',
+    def:['snaretrap','beast','piercingshot','dash'] },
+  engineer:{ label:'Gépész', role:'SZERKEZETÉPÍTŐ', req:3, col:'#ff9d4d', icon:'⚙️',
+    strong:'Telepített szerkezetek tartják a terepet', weak:'Lassú, helyhez kötött erő',
+    hp:140, speed:2.0, fireRate:28, bulletDmg:9, bulletSpeed:7, bulletCount:1,
+    armor:0.15, regen:0.02, critChance:0, lowHpDmg:0, cdScale:0.9, ult:'mechbarrage',
+    def:['minefield','laserwall','repairdrone','shield'] },
+  sealbearer:{ label:'Pecséthordozó', role:'MIND A KILENC PECSÉT URA', req:15, col:'#ffd166', icon:'🔯',
+    strong:'Bármelyik hős bármelyik pecsétjét használhatja', weak:'Egyik ereje sem a legerősebb saját változatában',
+    hp:150, speed:2.25, fireRate:20, bulletDmg:15, bulletSpeed:9, bulletCount:1,
+    armor:0.1, regen:0.02, critChance:0.1, lowHpDmg:0, cdScale:0.92, ult:'ninefold',
+    def:['fireball','shield','heal','dash','chain'], allAbilities:true, sealed:true },
+};
+// TESZT MÓD: ha true, minden hős és pecsét azonnal elérhető, szintkövetelmény nélkül —
+// ha később vissza akarod kapcsolni a normál, fokozatos feloldást, írd false-ra.
+const TEST_MODE_UNLOCK_ALL = false;
+function isClassUnlocked(id){ return TEST_MODE_UNLOCK_ALL || isAdminUser() || profileLevel() >= CLASSES[id].req; }
+
+/* =========================================================
+   KÉPESSÉGEK (adatvezérelt, 22 db) — run(p, rank)
+   ========================================================= */
+const ABILITIES = {
+  dash:{ label:'Dash', icon:'💨', req:1, cdMax:150, maxRank:3, desc:'Gyors kitérés, rövid sebezhetetlenség.',
+    run(p,r){ p.dashing=10+r*2; p.invuln=10+r*2; addParticles(p.x,p.y,p.color,10); } },
+  shield:{ label:'Pajzs', icon:'🛡️', req:1, cdMax:420, maxRank:3, desc:'Átmeneti sebezhetetlenség.',
+    run(p,r){ p.shieldActive=60+r*25; } },
+  fireball:{ label:'Tűzgolyó', icon:'🔥', req:1, cdMax:260, maxRank:4, desc:'Terjedő robbanás, terület-sebzés.',
+    run(p,r){ game.fireballs.push({x:p.x,y:p.y,r:8,life:70,dmg:16+r*6,hitEnemies:new Set()}); } },
+  ice:{ label:'Jéglökés', icon:'❄️', req:1, cdMax:460, maxRank:3, desc:'Lefagyasztja a közeli ellenfeleket.',
+    run(p,r){ game.enemies.forEach(en=>{ if(dist(en.x,en.y,p.x,p.y)<170+r*15){ en.frozen=80+r*20; en.hp-=5+r*3; } });
+      if(game.boss&&dist(game.boss.x,game.boss.y,p.x,p.y)<190){ game.boss.frozen=50; game.boss.hp-=10; } addParticles(p.x,p.y,'#8fd8ff',24); } },
+  chain:{ label:'Villámlánc', icon:'⚡', req:1, cdMax:340, maxRank:4, desc:'Több ellenfelet üt meg.',
+    run(p,r){ nearestEnemies(p.x,p.y,280,2+r).forEach(en=>{ en.hp-=14+r*6; en.hitFlash=8; addUltCharge(5);
+      game.particles.push({x:p.x,y:p.y,vx:0,vy:0,life:1,color:'#fff',bolt:{tx:en.x,ty:en.y}}); });
+      if(game.boss&&dist(game.boss.x,game.boss.y,p.x,p.y)<280){ game.boss.hp-=12; game.boss.hitFlash=8; } } },
+  heal:{ label:'Gyógyulás', icon:'✨', req:1, cdMax:475, maxRank:3, desc:'Azonnal életerőt ad.',
+    run(p,r){ p.hp=Math.min(p.maxHp,p.hp+p.maxHp*(0.22+r*0.06)); addParticles(p.x,p.y,'#8affc1',18); } },
+  surge:{ label:'Löket', icon:'🌀', req:1, cdMax:520, maxRank:3, desc:'Gyorsabb mozgás és tüzelés.',
+    run(p,r){ p.surgeActive=140+r*30; } },
+  turret:{ label:'Ágyú', icon:'🤖', req:1, cdMax:620, maxRank:3, desc:'Automata torony.',
+    run(p,r){ game.turrets.push({x:p.x,y:p.y,life:413+r*75,fireCd:0,dmg:6+r*2}); } },
+  meteor:{ label:'Meteor', icon:'☄️', req:1, cdMax:680, maxRank:4, desc:'Becsapódás a célzott pontra.',
+    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:42,r:95+r*10,dmg:40+r*10,exploded:false,color:'#ff8c3c'}); } },
+  shotgun:{ label:'Sörét', icon:'🔫', req:1, cdMax:170, maxRank:4, desc:'Hét lövedékes szórás előre.',
+    run(p,r){ for(let i=0;i<7;i++){ const a=p.facing+(i-3)*0.12; game.bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*9,vy:Math.sin(a)*9,r:4,life:32,dmg:6+r*2}); } } },
+  grenade:{ label:'Gránát', icon:'💣', req:1, cdMax:300, maxRank:3, desc:'Robbanás a célzott pontra.',
+    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:26,r:75+r*8,dmg:26+r*8,exploded:false,color:'#ffd24a'}); } },
+  blink:{ label:'Villanás', icon:'↗️', req:1, cdMax:240, maxRank:3, desc:'Teleport a célzás irányába.',
+    run(p,r){ const d=150+r*25; p.x=clamp(p.x+Math.cos(p.facing)*d,p.r,canvas.width-p.r); p.y=clamp(p.y+Math.sin(p.facing)*d,safeTop+p.r*0.5,canvas.height-safeBottom-p.r*0.5); p.invuln=10; resolveObstacles(p); addParticles(p.x,p.y,p.color,14); } },
+  shockwave:{ label:'Lökéshullám', icon:'🌊', req:2, cdMax:350, maxRank:3, desc:'Ellök és sebez körben.',
+    run(p,r){ aoeDamage(p.x,p.y,140+r*15,14+r*6,'#9fe'); knockback(p.x,p.y,170+r*15,36+r*8); addParticles(p.x,p.y,'#9fe',20); } },
+  lifesteal:{ label:'Vérszívás', icon:'🩸', req:2, cdMax:510, maxRank:3, desc:'Egy időre a sebzésed gyógyít.',
+    run(p,r){ p.buffs.lifesteal=Math.max(p.buffs.lifesteal,220+r*40); } },
+  berserk:{ label:'Düh', icon:'😤', req:2, cdMax:580, maxRank:3, desc:'Nagyobb sebzés, több sérülés.',
+    run(p,r){ p.buffs.berserk=Math.max(p.buffs.berserk,220+r*30); } },
+  multishot:{ label:'Sortűz', icon:'🎇', req:2, cdMax:540, maxRank:3, desc:'Egy időre három irányba lősz.',
+    run(p,r){ p.buffs.multishot=Math.max(p.buffs.multishot,200+r*35); } },
+  poison:{ label:'Méregfelhő', icon:'☠️', req:2, cdMax:400, maxRank:3, desc:'Folyamatosan sebző felhő.',
+    run(p,r){ game.clouds.push({x:input.aimX,y:input.aimY,r:75+r*10,life:180,dmg:3+r*1.6}); } },
+  cluster:{ label:'Szórásbomba', icon:'🧨', req:2, cdMax:380, maxRank:3, desc:'Több kis robbanás körülötted.',
+    run(p,r){ for(let i=0;i<3+r;i++){ const a=Math.random()*Math.PI*2, d=40+Math.random()*90;
+      game.meteors.push({x:p.x+Math.cos(a)*d,y:p.y+Math.sin(a)*d,t:0,delay:18+i*6,r:60,dmg:17+r*5,exploded:false,color:'#ff8c3c'}); } } },
+  railgun:{ label:'Sínágyú', icon:'🔆', req:2, cdMax:400, maxRank:4, desc:'Átütő energiasugár a célzás irányába.',
+    run(p,r){ const a=p.facing, len=1600, dmg=36+r*12; game.beams.push({x:p.x,y:p.y,a,life:10});
+      game.enemies.forEach(en=>{ const dx=en.x-p.x,dy=en.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<en.r+14){ en.hp-=dmg; en.hitFlash=8; addUltCharge(dmg*0.3); } });
+      if(game.boss){ const dx=game.boss.x-p.x,dy=game.boss.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<game.boss.r+14){ game.boss.hp-=dmg; game.boss.hitFlash=8; } } } },
+  timewarp:{ label:'Időlassítás', icon:'⏳', req:3, cdMax:660, maxRank:3, desc:'Rövid időre minden ellenfél lelassul.',
+    run(p,r){ game.slowT=Math.max(game.slowT,110+r*30); addParticles(p.x,p.y,'#bfe9ff',24); } },
+  drone:{ label:'Drón', icon:'🛸', req:3, cdMax:640, maxRank:3, desc:'Kísérő drón, ami az ellenfelekre lő.',
+    run(p,r){ game.drones.push({x:p.x,y:p.y-30,life:420+r*90,fireCd:0,dmg:6+r*2}); } },
+  adrenaline:{ label:'Adrenalin', icon:'💉', req:3, cdMax:780, maxRank:2, desc:'Minden más képességed feltöltődik.',
+    run(p,r){ p.abilities.forEach(ab=>{ if(ab.id!=='adrenaline') ab.cd=0; }); p.surgeActive=Math.max(p.surgeActive,120); addParticles(p.x,p.y,'#ffd166',18); } },
+
+  // ---- Nekromanta kizárólagos pecsétjei ----
+  raise:{ label:'Idézés', icon:'💀', req:1, cdMax:280, maxRank:3, desc:'Csontváz szolgát idézel, aki üldözi és közelharcban sebzi az ellenfeleket.', cls:'necromancer',
+    run(p,r){ game.turrets.push({x:p.x,y:p.y-20,life:260+r*70,fireCd:0,dmg:7+r*3,mobile:true,skeleton:true}); } },
+  soulbomb:{ label:'Lélekbomba', icon:'💥', req:1, cdMax:320, maxRank:3, desc:'Robbanás a célzott ponton.', cls:'necromancer',
+    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:32,r:80+r*10,dmg:26+r*9,exploded:false,color:'#9d5cff'}); } },
+  boneward:{ label:'Csontpajzs', icon:'🦴', req:1, cdMax:520, maxRank:3, desc:'Ideiglenesen jelentősen csökkenti a rád eső sebzést.', cls:'necromancer',
+    run(p,r){ p.buffs.boneward=Math.max(p.buffs.boneward,150+r*30); } },
+
+  // ---- Vadász kizárólagos pecsétjei ----
+  snaretrap:{ label:'Csapda', icon:'🪤', req:1, cdMax:240, maxRank:3, desc:'Csapdát rakysz a célzott pontra — az első ráérő ellenfelet gyökeret ereszti és sebzi.', cls:'hunter',
+    run(p,r){ game.traps.push({x:input.aimX,y:input.aimY,r:34,dmg:20+r*8,root:70+r*15,armed:true}); } },
+  beast:{ label:'Vadállat', icon:'🐺', req:1, cdMax:360, maxRank:3, desc:'Vad társat idézel, aki üldözi és harapja az ellenfeleket.', cls:'hunter',
+    run(p,r){ game.turrets.push({x:p.x,y:p.y-20,life:300+r*80,fireCd:0,dmg:8+r*3,mobile:true,beast:true}); } },
+  piercingshot:{ label:'Repesznyíl', icon:'🏹', req:1, cdMax:260, maxRank:4, desc:'Erős, áthatoló lövés a célzás irányába.', cls:'hunter',
+    run(p,r){ const a=p.facing, len=900, dmg=28+r*11; game.beams.push({x:p.x,y:p.y,a,life:8});
+      game.enemies.forEach(en=>{ const dx=en.x-p.x,dy=en.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<en.r+10){ en.hp-=dmg; en.hitFlash=8; addUltCharge(dmg*0.3); } });
+      if(game.boss){ const dx=game.boss.x-p.x,dy=game.boss.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<game.boss.r+10){ game.boss.hp-=dmg; game.boss.hitFlash=8; } } } },
+
+  // ---- Gépész kizárólagos pecsétjei ----
+  minefield:{ label:'Aknamező', icon:'💠', req:1, cdMax:340, maxRank:3, desc:'Három aknát telepítesz magad köré.', cls:'engineer',
+    run(p,r){ for(let i=0;i<3;i++){ const a=(i/3)*Math.PI*2+Math.random()*0.6, d=50+Math.random()*40;
+      game.traps.push({x:p.x+Math.cos(a)*d,y:p.y+Math.sin(a)*d,r:30,dmg:18+r*7,root:40,armed:true}); } } },
+  laserwall:{ label:'Lézerfal', icon:'🔺', req:1, cdMax:380, maxRank:3, desc:'Zúgó energiamező a célzott ponton — mindenkit sebez, aki belelép.', cls:'engineer',
+    run(p,r){ game.clouds.push({x:input.aimX,y:input.aimY,r:70+r*8,life:170,dmg:4+r*2,color:'#ff9d4d'}); } },
+  repairdrone:{ label:'Javító-drón', icon:'🔧', req:1, cdMax:460, maxRank:3, desc:'Lebegő drónt telepítesz, ami a közeledben folyamatosan gyógyít.', cls:'engineer',
+    run(p,r){ game.drones.push({x:p.x,y:p.y-30,life:340+r*70,fireCd:0,heal:0.4+r*0.15}); } },
+
+  // ---- Új, mindenki számára elérhető pecsétek ----
+  strike:{ label:'Villámcsapás', icon:'⚡', req:1, cdMax:300, maxRank:3, desc:'Azonnali villámcsapás a célzott pontra.',
+    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:10,r:60+r*8,dmg:30+r*10,exploded:false,color:'#e8f4ff'}); } },
+  healcloud:{ label:'Gyógyfelhő', icon:'💚', req:1, cdMax:520, maxRank:3, desc:'Gyógyító felhőt hozol létre — amíg benne állsz, folyamatosan gyógyulsz.',
+    run(p,r){ game.clouds.push({x:p.x,y:p.y,r:75+r*10,life:200,dmg:0,heal:0.4+r*0.2,color:'#8affc1'}); } },
+  bloodmagic:{ label:'Vérmágia', icon:'🩸', req:2, cdMax:260, maxRank:3, desc:'Feláldozod egy részét az életerődnek egy hatalmas robbanásért.',
+    run(p,r){ const cost=Math.min(p.hp-1,p.maxHp*0.12); p.hp=Math.max(1,p.hp-cost); aoeDamage(p.x,p.y,130+r*15,cost*2+r*10,'#ff2d55'); addParticles(p.x,p.y,'#ff2d55',24); } },
+  mirrorshield:{ label:'Tükörpajzs', icon:'🪞', req:2, cdMax:340, maxRank:3, desc:'Rövid sebezhetetlenség, ami robbanást indít mindenre, ami hozzád ér.',
+    run(p,r){ p.invuln=Math.max(p.invuln,50+r*10); aoeDamage(p.x,p.y,110+r*12,16+r*7,'#bfe9ff'); addParticles(p.x,p.y,'#bfe9ff',20); } },
+  mortar:{ label:'Aknavető', icon:'💥', req:1, cdMax:320, maxRank:4, desc:'Három robbanást zúdítasz a célzott területre.',
+    run(p,r){ for(let i=0;i<3;i++){ game.meteors.push({x:input.aimX+(Math.random()-0.5)*70,y:input.aimY+(Math.random()-0.5)*70,t:0,delay:14+i*16,r:65+r*7,dmg:16+r*6,exploded:false,color:'#ffb347'}); } } },
+
+  // ---- "Epikus" pecsétek — 10 rangig fejleszthetők, sokkal több játékkal, de a csúcson félelmetesek ----
+  apocalypse:{ label:'Apokalipszis', icon:'☄️', req:3, cdMax:820, maxRank:10, epic:true,
+    desc:'Hosszú töltés után hatalmas becsapódás. Rangonként drámaian erősödik — igazi erejét csak a legmagasabb (10.) rangon éri el.',
+    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:55,r:130+r*16,dmg:60+r*38,exploded:false,color:'#ff2d55'}); } },
+  eternalshield:{ label:'Örök Pajzs', icon:'🛡️', req:3, cdMax:700, maxRank:10, epic:true,
+    desc:'Hosszú sebezhetetlenség. Minél magasabb a rangja, annál tovább tart — a 10. rangon szinte megállíthatatlanná tesz.',
+    run(p,r){ p.shieldActive=Math.max(p.shieldActive, 70+r*48); } },
+  doomarrow:{ label:'Végzet Nyila', icon:'🏹', req:3, cdMax:480, maxRank:10, epic:true,
+    desc:'Áthatoló lövedék, ami rangonként egyre nagyobb sebzést halmoz — a 10. rangon szinte bármit egy csapásra elintéz.',
+    run(p,r){ const a=p.facing, len=1400, dmg=40+r*32; game.beams.push({x:p.x,y:p.y,a,life:9});
+      game.enemies.forEach(en=>{ const dx=en.x-p.x,dy=en.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<en.r+12){ en.hp-=dmg; en.hitFlash=8; addUltCharge(dmg*0.25); } });
+      if(game.boss){ const dx=game.boss.x-p.x,dy=game.boss.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<game.boss.r+12){ game.boss.hp-=dmg; game.boss.hitFlash=8; } } } },
+
+  // ---- "Legendás" pecsétek — jóval magasabb szinten nyílnak, mint az epikusok,
+  //      és már 1. rangon is erősek, de ugyanúgy 10 rangig fejlődnek tovább ----
+  judgment:{ label:'Végítélet', icon:'⚡', req:8, cdMax:880, maxRank:10, legendary:true,
+    desc:'Már az első rangon is félelmetes erejű villámcsapás, ami rangonként tovább nő.',
+    run(p,r){ game.meteors.push({x:input.aimX,y:input.aimY,t:0,delay:40,r:140+r*12,dmg:130+r*34,exploded:false,color:'#fff5c2'}); } },
+  deathcrown:{ label:'Halál Koronája', icon:'👑', req:8, cdMax:760, maxRank:10, legendary:true,
+    desc:'Azonnali, súlyos robbanás körülötted — már az első rangon is komoly csapás, nem csak a csúcson.',
+    run(p,r){ aoeDamage(p.x,p.y,170+r*10,110+r*32,'#c9a6ff'); knockback(p.x,p.y,200+r*12,60+r*8); addParticles(p.x,p.y,'#c9a6ff',34); } },
+  immortal:{ label:'Halhatatlanság', icon:'✨', req:8, cdMax:840, maxRank:10, legendary:true,
+    desc:'Már alapból hosszú sebezhetetlenség, ami rangonként tovább nő.',
+    run(p,r){ p.shieldActive=Math.max(p.shieldActive, 140+r*42); } },
+  allpiercer:{ label:'Mindent Átdöfő', icon:'🔱', req:8, cdMax:580, maxRank:10, legendary:true,
+    desc:'Erős, áthatoló energianyaláb — már az első rangon is komoly sebzést oszt, nem csak magas rangon.',
+    run(p,r){ const a=p.facing, len=1500, dmg=95+r*28; game.beams.push({x:p.x,y:p.y,a,life:10});
+      game.enemies.forEach(en=>{ const dx=en.x-p.x,dy=en.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<en.r+13){ en.hp-=dmg; en.hitFlash=8; addUltCharge(dmg*0.25); } });
+      if(game.boss){ const dx=game.boss.x-p.x,dy=game.boss.y-p.y, proj=dx*Math.cos(a)+dy*Math.sin(a), perp=Math.abs(-dx*Math.sin(a)+dy*Math.cos(a));
+        if(proj>0&&proj<len&&perp<game.boss.r+13){ game.boss.hp-=dmg; game.boss.hitFlash=8; } } } },
+  mistform:{ label:'Köddéválás', icon:'🌫️', req:8, cdMax:780, maxRank:10, legendary:true,
+    desc:'Köddé válsz — az ellenfelek elvesztik a nyomod, és a régi helyed felé rontanak, míg te elsétálhatsz onnan. Rangonként tovább tart.',
+    run(p,r){ p.buffs.invisible=Math.max(p.buffs.invisible, 60+r*24); game._invisPt={x:p.x,y:p.y}; addParticles(p.x,p.y,'#8b8fa3',24); } },
+};
+function isAbilityUnlocked(id){ return TEST_MODE_UNLOCK_ALL || isAdminUser() || profileLevel() >= (ABILITIES[id].req||1); }
+runDailyHeroBalanceCheck();
+
+/* =========================================================
+   ULTIMATE-ÖK (töltődő, classonként egy) — run(p)
+   ========================================================= */
+const ULTIMATES = {
+  fortress:{ label:'Erőd', icon:'🏰', chargeMax:680, desc:'Nagy pajzs, gyógyulás és sokk körben.',
+    run(p){ p.shieldActive=Math.max(p.shieldActive,200); p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.3);
+      aoeDamage(p.x,p.y,200,32,'#9fe'); knockback(p.x,p.y,240,60); addParticles(p.x,p.y,'#7bd88f',40); } },
+  precision:{ label:'Precíziós mód', icon:'🎯', chargeMax:760, desc:'Minden lövés átüt és kritikus egy időre.',
+    run(p){ p.buffs.precision=260; addParticles(p.x,p.y,'#3ddc97',30); } },
+  bloodrage:{ label:'Vérdüh', icon:'🔥', chargeMax:720, desc:'Óriási sebzés, sebesség és vérszívás.',
+    run(p){ p.buffs.berserkUlt=280; p.buffs.lifesteal=Math.max(p.buffs.lifesteal,280); p.surgeActive=Math.max(p.surgeActive,280); addParticles(p.x,p.y,'#ff5c3c',40); } },
+  elemental:{ label:'Elemi vihar', icon:'🌩️', chargeMax:800, desc:'Meteorzápor és villámok az egész pályán.',
+    run(p){ for(let i=0;i<8;i++){ game.meteors.push({x:60+Math.random()*(canvas.width-120),y:60+Math.random()*(canvas.height-120),t:0,delay:20+i*7,r:100,dmg:45,exploded:false,color:'#8b5cf6'}); }
+      nearestEnemies(p.x,p.y,99999,6).forEach(en=>{ en.hp-=32; en.hitFlash=8; game.particles.push({x:p.x,y:p.y,vx:0,vy:0,life:1,color:'#c9a6ff',bolt:{tx:en.x,ty:en.y}}); }); } },
+  shadowstep:{ label:'Árnyéklépés', icon:'🌑', chargeMax:680, desc:'Láthatatlanság — az ellenfelek elvesztik a nyomodat.',
+    run(p){ p.buffs.invisible=220; game._invisPt={x:p.x,y:p.y}; p.buffs.precision=Math.max(p.buffs.precision,120); addParticles(p.x,p.y,'#ff5c7c',30); } },
+  lifeaura:{ label:'Éltető aura', icon:'✚', chargeMax:720, desc:'Teljes gyógyulás, minden képesség feltöltődik, tornyok.',
+    run(p){ p.hp=p.maxHp; p.abilities.forEach(ab=>ab.cd=0);
+      for(let i=0;i<2;i++){ const a=i/2*Math.PI*2; game.turrets.push({x:p.x+Math.cos(a)*40,y:p.y+Math.sin(a)*40,life:450,fireCd:0,dmg:8}); }
+      addParticles(p.x,p.y,'#6ee7ff',40); } },
+  undeadlegion:{ label:'Holtak Serege', icon:'💀', chargeMax:740, desc:'Csontváz-sereget idézel magad köré, akik üldözik és sebzik az ellenfeleket.',
+    run(p){ for(let i=0;i<4;i++){ const a=i/4*Math.PI*2; game.turrets.push({x:p.x+Math.cos(a)*45,y:p.y+Math.sin(a)*45,life:420,fireCd:0,dmg:12,mobile:true,skeleton:true}); }
+      addParticles(p.x,p.y,'#9d5cff',40); } },
+  huntingground:{ label:'Vadászterület', icon:'🏹', chargeMax:700, desc:'Nagy terület, ami erősen sebzi az összes belül tartózkodó ellenfelet.',
+    run(p){ game.clouds.push({x:p.x,y:p.y,r:260,life:320,dmg:3.2,color:'#c9a24a'}); addParticles(p.x,p.y,'#c9a24a',30); } },
+  mechbarrage:{ label:'Gépi Roham', icon:'⚙️', chargeMax:760, desc:'Nehézgéppuskás harci szerkezetet telepítesz, ami gyorsan és erősen tüzel.',
+    run(p){ game.turrets.push({x:p.x,y:p.y-30,life:420,fireCd:0,dmg:16,heavy:true}); addParticles(p.x,p.y,'#ff9d4d',30); } },
+  ninefold:{ label:'Kilenc Pecsét Ereje', icon:'🔯', chargeMax:820, desc:'Mind a kilenc pecsét erejéből egy kevés — gyógyulás, pajzs, sebzés és gyorsulás egyszerre, csökkentett mértékben.',
+    run(p){
+      p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.22); p.shieldActive=Math.max(p.shieldActive,110);
+      p.surgeActive=Math.max(p.surgeActive,150); p.buffs.lifesteal=Math.max(p.buffs.lifesteal,120);
+      aoeDamage(p.x,p.y,150,20,'#ffd166'); knockback(p.x,p.y,170,34);
+      addParticles(p.x,p.y,'#ffd166',44);
+    } },
+};
+
+/* ---------- Loadout (menü) állapot ---------- */
+let chosenClass = 'tank';
+let equipped = [];           // felszerelt képesség-id-k, max 5
+let abilityKeys = {};        // képesség-id -> billentyű (nem slot-pozícióhoz kötve)
+const DEFAULT_KEYS = ['q','e','r','f','c'];
+let ultKey = 'v';
+let listeningSlot = null;    // képesség-id, 'ult', vagy null — épp billentyűre vár
+const MAX_SLOTS = 5;
+
+let game = null;
+const MAX_WAVES = 12;      // ennyi rendes hullám után jön a fő boss
+const MINIBOSS_EVERY = 8;  // végtelen módban ennyi hullámonként jön egy mini-boss
+
+// ---------- Input állapot ----------
+let keys = {};
+let mouse = { x: window.innerWidth/2, y: window.innerHeight/2, down:false };
+const input = {
+  touchMode:false,
+  left:  { active:false, id:null, baseX:0, baseY:0, kx:0, ky:0, dx:0, dy:0 },
+  right: { active:false, id:null, baseX:0, baseY:0, kx:0, ky:0, angle:0, fire:false },
+  aimX: window.innerWidth/2, aimY: window.innerHeight/2,
+};
+function resetSticks(){ input.left.active=false; input.left.id=null; input.left.dx=0; input.left.dy=0;
+  input.right.active=false; input.right.id=null; input.right.fire=false; }
+
+/* =========================================================
+   KONTROLLER (Gamepad API) — Xbox és PlayStation
+   A böngésző mindkettőt szabványos kiosztásra képezi le:
+   0=A/Kereszt 1=B/Kör 2=X/Négyzet 3=Y/Háromszög 4=LB/L1 5=RB/R1
+   6=LT/L2 7=RT/R2 9=Start/Options 12-15=d-pad
+   Kiosztás: bal kar mozgás · jobb kar célzás+lövés (vagy RT)
+   · 0-4 gomb = képesség-slotok · RB = ult · Start = szünet
+   ========================================================= */
+const pad = { gp:null, connected:false, mx:0, my:0, ax:0, ay:0, aiming:false, firing:false, prevBtns:[], navCd:0 };
+function padDead(v, dz){ return Math.abs(v)<dz ? 0 : (v-Math.sign(v)*dz)/(1-dz); }
+function padRumble(strong, weak, ms){
+  try{
+    if(pad.gp && pad.gp.vibrationActuator && pad.gp.vibrationActuator.playEffect)
+      pad.gp.vibrationActuator.playEffect('dual-rumble',
+        { duration:ms, strongMagnitude:strong, weakMagnitude:weak }).catch(()=>{});
+  }catch(e){}
+}
+function pollGamepad(){
+  const gps = (typeof navigator!=='undefined' && navigator.getGamepads) ? navigator.getGamepads() : [];
+  let gp = null;
+  for(const g of gps){ if(g && g.connected){ gp = g; break; } }
+  pad.gp = gp; pad.connected = !!gp;
+  if(!gp){ pad.mx=0; pad.my=0; pad.aiming=false; pad.firing=false; pad.prevBtns=[]; return; }
+  const dz = 0.18;
+  // bal kar: mozgás
+  pad.mx = padDead(gp.axes[0]||0, dz);
+  pad.my = padDead(gp.axes[1]||0, dz);
+  // jobb kar: célzás; megdöntve lő (twin-stick), RT/R2 is lő
+  const rx = padDead(gp.axes[2]||0, dz), ry = padDead(gp.axes[3]||0, dz);
+  const rm = Math.hypot(rx, ry);
+  pad.aiming = rm > 0.12;
+  if(pad.aiming){ pad.ax = rx; pad.ay = ry; }
+  const btn = i => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value>0.4));
+  pad.firing = (pad.aiming && rm > 0.3) || btn(7);
+  // gomb-élek (lenyomás/felengedés pillanata)
+  const cur = [];
+  for(let i=0;i<gp.buttons.length && i<17;i++) cur[i] = btn(i);
+  const edge = i => cur[i] && !pad.prevBtns[i];
+  const rel  = i => !cur[i] && pad.prevBtns[i];
+  const p = game && game.player;
+  if(p){
+    // képesség-slotok: A/Kereszt, B/Kör, X/Négyzet, Y/Háromszög, LB/L1 — a meglévő keys[] mechanizmuson át
+    p.abilities.forEach((ab,i)=>{
+      if(i>4 || !ab.key) return;
+      if(edge(i) && game.state==='playing') keys[ab.key] = true;
+      if(rel(i)) keys[ab.key] = false;                 // felengedés mindig érvényes (ne ragadjon be)
+    });
+    if(p.ult && p.ult.key){
+      if(edge(5) && game.state==='playing') keys[p.ult.key] = true;
+      if(rel(5)) keys[p.ult.key] = false;
+    }
+  }
+  if(edge(9) && game) togglePause();                   // Start / Options
+  // menüben / átvezetőn: fókusz-navigáció d-paddel vagy bal karral, A = választ, B = vissza
+  const inMenu = !game || game.state!=='playing';
+  if(inMenu){
+    let mvX=0, mvY=0;
+    if(edge(12)) mvY=-1; else if(edge(13)) mvY=1;      // d-pad fel/le
+    if(edge(14)) mvX=-1; else if(edge(15)) mvX=1;      // d-pad balra/jobbra
+    // bal VAGY jobb kar: első mozdulat azonnal lép, tartva ~200ms-onként ismétel
+    const jx = Math.abs(pad.mx)>Math.abs(rx) ? pad.mx : rx;
+    const jy = Math.abs(pad.my)>Math.abs(ry) ? pad.my : ry;
+    const sx = Math.abs(jx)>0.5?Math.sign(jx):0, sy = Math.abs(jy)>0.5?Math.sign(jy):0;
+    if(sx||sy){ if(pad.navCd<=0){ if(!mvX) mvX=sx; if(!mvY) mvY=sy; pad.navCd=12; } else pad.navCd--; }
+    else pad.navCd=0;
+    if(mvX||mvY) padMove(mvX,mvY);
+    if(edge(0)) padActivate();                         // A/Kereszt
+    if(edge(1)) padBack();                             // B/Kör
+  }
+  pad.prevBtns = cur;
+}
+/* A/Kereszt: az épp látható képernyő elsődleges gombja (játék közben nem csinál semmit itt,
+   ott a 0-s gomb az 1. képesség) */
+function padConfirm(){
+  if(game && game.state==='playing') return;
+  const vis = id => !document.getElementById(id).classList.contains('hidden');
+  if(vis('bossIntro')) document.getElementById('bossStartBtn').click();
+  else if(vis('storyIntro')) document.getElementById('storyStartBtn').click();
+  else if(vis('pauseScreen')) document.getElementById('resumeBtn').click();
+  else if(vis('deathScreen')) document.getElementById('restartBtnDeath').click();
+  else if(vis('winScreen')){
+    const e = document.getElementById('endlessBtn');
+    (e.classList.contains('hidden') ? document.getElementById('restartBtnWin') : e).click();
+  }
+  else if(vis('mapScreen')){ showScreen('storyIntro'); renderStoryIntro(); }
+  else if(vis('startScreen')) document.getElementById('startBtn').click();
+}
+
+/* ---- Menü-navigáció kontrollerrel: térbeli fókusz-mozgatás + kattintás ---- */
+let padFocusEl = null;
+function setPadFocus(el){
+  if(padFocusEl && padFocusEl.classList) padFocusEl.classList.remove('padFocus');
+  padFocusEl = el || null;
+  if(padFocusEl){
+    padFocusEl.classList.add('padFocus');
+    if(padFocusEl.scrollIntoView) padFocusEl.scrollIntoView({ block:'nearest' });
+  }
+}
+// az épp látható képernyő kattintható elemei
+function padFocusables(){
+  const scr = SCREENS.find(id=>{ const el=document.getElementById(id); return el && !el.classList.contains('hidden'); });
+  if(!scr) return [];
+  const root = document.getElementById(scr);
+  if(!root.querySelectorAll) return [];
+  return Array.from(root.querySelectorAll(
+    '.swatch, .headOpt, .classCard:not(.locked), .abCell:not(.locked), .diffBtn, .keyBtn, button.bigBtn'))
+    .filter(el=>!el.classList.contains('hidden'));
+}
+// fókusz léptetése a kért irányba (legközelebbi elem a fő irányban, oldalirányú büntetéssel)
+function padMove(dx, dy){
+  const els = padFocusables(); if(!els.length) return;
+  if(!padFocusEl || !els.includes(padFocusEl)){ setPadFocus(els[0]); return; }
+  const r0 = padFocusEl.getBoundingClientRect();
+  const cx0 = r0.left+r0.width/2, cy0 = r0.top+r0.height/2;
+  let best=null, bestScore=Infinity;
+  for(const el of els){
+    if(el===padFocusEl) continue;
+    const r = el.getBoundingClientRect();
+    const vx = r.left+r.width/2-cx0, vy = r.top+r.height/2-cy0;
+    const proj = vx*dx + vy*dy;                 // előrehaladás a kért irányban
+    if(proj <= 4) continue;
+    const perp = Math.abs(vx*dy - vy*dx);       // oldalirányú eltérés
+    const score = proj + perp*2.5;
+    if(score < bestScore){ bestScore = score; best = el; }
+  }
+  if(best) setPadFocus(best);
+}
+// A/Kereszt: fókuszált elem kattintása; fókusz nélkül a nagy menükben fókuszál, átvezetőn továbblép
+function padActivate(){
+  if(game && game.state==='playing') return;
+  const els = padFocusables();
+  if(padFocusEl && els.includes(padFocusEl)){
+    const idx = els.indexOf(padFocusEl);
+    padFocusEl.click();
+    // kattintás után a menü újraépülhet (a régi elem "árva" lesz) -> fókusz vissza ugyanarra a pozícióra
+    const els2 = padFocusables();
+    if(!padFocusEl || !els2.includes(padFocusEl)) setPadFocus(els2[Math.min(idx, els2.length-1)] || null);
+    return;
+  }
+  const scr = SCREENS.find(id=>{ const el=document.getElementById(id); return el && !el.classList.contains('hidden'); });
+  if(scr==='startScreen' || scr==='mapScreen') setPadFocus(els[0] || null);
+  else padConfirm();
+}
+// B/Kör: vissza / folytatás
+function padBack(){
+  if(game && game.state==='playing') return;
+  const vis = id => !document.getElementById(id).classList.contains('hidden');
+  if(vis('pauseScreen')) document.getElementById('resumeBtn').click();
+  else if(vis('mapScreen')) document.getElementById('mapBackBtn').click();
+}
+
+window.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  // billentyű-átállítás a menüben
+  if(listeningSlot !== null){
+    e.preventDefault();
+    if(k !== 'escape' && !RESERVED_KEYS.has(k)) assignKey(listeningSlot, k===' ' ? ' ' : k);
+    listeningSlot = null; buildLoadoutUI();
+    return;
+  }
+  if(k===' ') e.preventDefault(); // ne görgessen a szóköz
+  keys[k] = true;
+  if((k==='escape' || k==='p') && game) togglePause();
+});
+window.addEventListener('keyup', e=> keys[e.key.toLowerCase()] = false);
+canvas.addEventListener('mousemove', e=>{ mouse.x = e.clientX; mouse.y = e.clientY; });
+canvas.addEventListener('mousedown', ()=> mouse.down = true);
+window.addEventListener('mouseup', ()=> mouse.down = false);
+
+// ---------- Érintés: két virtuális botkormány ----------
+const STICK_MAX = 72;
+function stickZone(x){ return x < window.innerWidth/2 ? 'left' : 'right'; }
+canvas.addEventListener('pointerdown', e=>{
+  if(e.pointerType !== 'touch') return;
+  input.touchMode = true;
+  const x=e.clientX, y=e.clientY, zone=stickZone(x);
+  const s = input[zone];
+  // ha már foglalt a fél, az új érintés veszi át (nem marad "halott" botkormány)
+  s.active=true; s.id=e.pointerId; s.baseX=x; s.baseY=y; s.kx=x; s.ky=y;
+  if(zone==='left'){ s.dx=0; s.dy=0; }
+  else { s.angle = (game&&game.player) ? game.player.facing : 0; s.fire=false; }
+  e.preventDefault();
+}, {passive:false});
+canvas.addEventListener('pointermove', e=>{
+  if(e.pointerType !== 'touch') return;
+  ['left','right'].forEach(z=>{
+    const s=input[z];
+    if(!s.active || s.id!==e.pointerId) return;
+    let dx=e.clientX-s.baseX, dy=e.clientY-s.baseY;
+    const m=Math.hypot(dx,dy);
+    if(m>STICK_MAX){ dx*=STICK_MAX/m; dy*=STICK_MAX/m; }
+    s.kx=s.baseX+dx; s.ky=s.baseY+dy;
+    if(z==='left'){ s.dx=dx/STICK_MAX; s.dy=dy/STICK_MAX; }
+    else { if(m>8){ s.angle=Math.atan2(dy,dx); s.fire=true; } else { s.fire=false; } }
+  });
+  e.preventDefault();
+}, {passive:false});
+function endPointer(e){
+  ['left','right'].forEach(z=>{
+    const s=input[z];
+    if(s.active && s.id===e.pointerId){ s.active=false; s.id=null; if(z==='left'){s.dx=0;s.dy=0;} else s.fire=false; }
+  });
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+
+// (a képesség-ikonok most dinamikusan épülnek — lásd buildAbilityBar)
+// mozgás/rendszer-billentyűk nem köthetők képességre
+const RESERVED_KEYS = new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','p','escape']);
+function displayKey(t){ return t===' ' ? 'SPACE' : (t||'').toUpperCase(); }
+function usedKeys(exceptTarget){
+  const u=new Set();
+  equipped.forEach(id=>{ if(id!==exceptTarget && abilityKeys[id]) u.add(abilityKeys[id]); });
+  if(ultKey && exceptTarget!=='ult') u.add(ultKey);
+  return u;
+}
+function freeDefaultKey(){ const u=usedKeys(); return DEFAULT_KEYS.find(k=>!u.has(k)) || ''; }
+function assignKey(target, key){
+  // ütközés feloldása CSERÉVEL — így nem marad üres/halott billentyű
+  if(target==='ult'){
+    const prev=ultKey;
+    equipped.forEach(id=>{ if(abilityKeys[id]===key) abilityKeys[id]=prev; });
+    ultKey=key;
+  } else {
+    const prev=abilityKeys[target]||'';
+    if(ultKey===key) ultKey=prev;
+    equipped.forEach(id=>{ if(id!==target && abilityKeys[id]===key) abilityKeys[id]=prev; });
+    abilityKeys[target]=key;
+  }
+}
+/* =========================================================
+   RAJZOLÓ KÖNYVTÁR — fejek felülnézetből (forward = +x)
+   ========================================================= */
+function eyeGlow(g, x, y, r, col){
+  g.beginPath(); g.arc(x,y,r,0,PI2); g.fillStyle=col; g.shadowColor=col; g.shadowBlur=r*2.2; g.fill(); g.shadowBlur=0;
+}
+
+// --- 5 menő játékos-fej ---
+function drawPlayerHead(g, cx, cy, hr, facing, style, accent){
+  withRot(g, cx, cy, facing, ()=>{
+    if(style==='gasmask'){
+      g.beginPath(); g.arc(0,0,hr,0,PI2); g.fillStyle='#2b2f3a'; g.fill();
+      g.lineWidth=hr*0.12; g.strokeStyle='#15181f'; g.stroke();
+      g.beginPath(); g.arc(-hr*0.15,-hr*0.15,hr*0.62,0,PI2); g.fillStyle='rgba(255,255,255,0.06)'; g.fill();
+      // két szűrő-szem
+      for(const s of [-1,1]){
+        g.beginPath(); g.arc(hr*0.42, s*hr*0.42, hr*0.27,0,PI2); g.fillStyle='#0c0f16'; g.fill();
+        g.lineWidth=hr*0.1; g.strokeStyle=accent; g.beginPath(); g.arc(hr*0.42, s*hr*0.42, hr*0.27,0,PI2); g.stroke();
+        eyeGlow(g, hr*0.48, s*hr*0.42, hr*0.1, accent);
+      }
+      // légzőpatron előre
+      g.fillStyle='#3a4150'; rr(g, hr*0.55,-hr*0.18,hr*0.6,hr*0.36,hr*0.12); g.fill();
+      g.fillStyle='#20242e'; rr(g, hr*1.0,-hr*0.13,hr*0.2,hr*0.26,hr*0.06); g.fill();
+    } else if(style==='cyber'){
+      g.beginPath(); g.arc(0,0,hr,0,PI2); g.fillStyle='#20242e'; g.fill();
+      g.lineWidth=hr*0.12; g.strokeStyle='#0e1016'; g.stroke();
+      g.beginPath(); g.arc(-hr*0.12,-hr*0.12,hr*0.55,0,PI2); g.fillStyle='rgba(255,255,255,0.08)'; g.fill();
+      // ragyogó vizor (előre néző sáv)
+      g.save(); g.shadowColor=accent; g.shadowBlur=hr*0.9; g.fillStyle=accent;
+      rr(g, hr*0.32,-hr*0.62, hr*0.34, hr*1.24, hr*0.17); g.fill(); g.restore();
+      g.fillStyle='rgba(0,0,0,0.35)'; rr(g, hr*0.42,-hr*0.5, hr*0.12, hr*1.0, hr*0.06); g.fill();
+      // antenna hátul
+      g.strokeStyle='#3a4150'; g.lineWidth=hr*0.09;
+      g.beginPath(); g.moveTo(-hr*0.7,-hr*0.35); g.lineTo(-hr*1.15,-hr*0.6); g.stroke();
+      eyeGlow(g, -hr*1.15,-hr*0.6, hr*0.08, accent);
+    } else if(style==='ninja'){
+      g.beginPath(); g.moveTo(-hr*1.05,0); g.lineTo(-hr*0.3,-hr*0.85); g.lineTo(-hr*0.3,hr*0.85); g.closePath();
+      g.fillStyle='#12141b'; g.fill();
+      g.beginPath(); g.arc(0,0,hr,0,PI2); g.fillStyle='#171a21'; g.fill();
+      g.lineWidth=hr*0.1; g.strokeStyle='#0a0c11'; g.stroke();
+      g.beginPath(); g.arc(hr*0.28,0,hr*0.72,0,PI2); g.fillStyle='#0b0d12'; g.fill();
+      // szemrés (két ragyogó vonal)
+      g.save(); g.shadowColor=accent; g.shadowBlur=hr*0.8; g.fillStyle=accent;
+      for(const s of [-1,1]){ rr(g, hr*0.38, s*hr*0.34-hr*0.06, hr*0.4, hr*0.12, hr*0.06); g.fill(); }
+      g.restore();
+    } else if(style==='spartan'){
+      g.beginPath(); g.arc(0,0,hr,0,PI2); g.fillStyle='#8b909c'; g.fill();
+      g.lineWidth=hr*0.12; g.strokeStyle='#4a4f5a'; g.stroke();
+      g.beginPath(); g.arc(-hr*0.15,-hr*0.15,hr*0.55,0,PI2); g.fillStyle='rgba(255,255,255,0.14)'; g.fill();
+      // taréj (mohawk) elülső-hátsó tengely mentén
+      g.save(); g.shadowColor=accent; g.shadowBlur=hr*0.5; g.fillStyle=accent;
+      g.beginPath(); g.ellipse(0,0,hr*0.95,hr*0.2,0,0,PI2); g.fill(); g.restore();
+      // T-vizor elöl
+      g.fillStyle='#20242e';
+      rr(g, hr*0.5,-hr*0.5, hr*0.16, hr*1.0, hr*0.05); g.fill();
+      rr(g, hr*0.55,-hr*0.14, hr*0.4, hr*0.28, hr*0.05); g.fill();
+    } else { // commando (alap)
+      g.beginPath(); g.arc(0,0,hr,0,PI2); g.fillStyle='#4c5640'; g.fill();
+      g.lineWidth=hr*0.12; g.strokeStyle='#2e3626'; g.stroke();
+      g.beginPath(); g.arc(-hr*0.15,-hr*0.15,hr*0.6,0,PI2); g.fillStyle='rgba(255,255,255,0.08)'; g.fill();
+      // sisak-perem elöl
+      g.beginPath(); g.arc(0,0,hr*0.98,-1.15,1.15); g.arc(0,0,hr*0.6,1.15,-1.15,true); g.closePath();
+      g.fillStyle='#3a4230'; g.fill();
+      // éjjellátó (NVG) két lencse
+      for(const s of [-1,1]){
+        g.beginPath(); g.arc(hr*0.52, s*hr*0.34, hr*0.24,0,PI2); g.fillStyle='#0c0f16'; g.fill();
+        g.lineWidth=hr*0.09; g.strokeStyle='#39422f'; g.beginPath(); g.arc(hr*0.52, s*hr*0.34, hr*0.24,0,PI2); g.stroke();
+        eyeGlow(g, hr*0.58, s*hr*0.34, hr*0.09, accent);
+      }
+    }
+  });
+}
+
+// --- teljes játékos: fegyver + törzs + fej + név ---
+function drawPlayer(g, p){
+  // fegyvercső (célzás irány jól látható)
+  withRot(g, p.x, p.y, p.facing, ()=>{
+    g.fillStyle='#20242e'; rr(g, p.r*0.3, -p.r*0.16, p.r*1.25, p.r*0.32, p.r*0.08); g.fill();
+    g.fillStyle='#3a4150'; rr(g, p.r*0.3, -p.r*0.16, p.r*0.55, p.r*0.32, p.r*0.08); g.fill();
+  });
+  // törzs
+  g.beginPath(); g.arc(p.x,p.y,p.r,0,PI2);
+  g.fillStyle = p.invuln>0 ? '#fff' : p.color;
+  g.shadowColor = p.color; g.shadowBlur = p.surgeActive>0 ? 26 : 14; g.fill(); g.shadowBlur=0;
+  g.lineWidth=2; g.strokeStyle='rgba(255,255,255,0.85)'; g.stroke();
+  g.beginPath(); g.arc(p.x-p.r*0.28,p.y-p.r*0.28,p.r*0.5,0,PI2); g.fillStyle='rgba(255,255,255,0.12)'; g.fill();
+  // fej
+  drawPlayerHead(g, p.x, p.y, p.r*0.72, p.facing, p.head, p.color);
+  // név
+  g.font='12px Trebuchet MS'; g.fillStyle='rgba(255,255,255,0.7)'; g.textAlign='center';
+  g.fillText(p.name, p.x, p.y - p.r - 16);
+}
+
+// --- 9 megkülönböztethető ellenfél-fej ---
+function drawEnemyFace(g, en, face){
+  const R = en.r;
+  withRot(g, en.x, en.y, face, ()=>{
+    if(en.type==='grunt'){
+      g.beginPath(); g.arc(0,0,R*0.8,0,PI2); g.fillStyle='#39404e'; g.fill();
+      g.lineWidth=R*0.12; g.strokeStyle='#20242e'; g.stroke();
+      g.fillStyle='#0e1017'; rr(g, R*0.16,-R*0.5,R*0.52,R*1.0,R*0.14); g.fill();
+      g.fillStyle='#ff5555'; g.beginPath(); g.arc(R*0.46,-R*0.22,R*0.09,0,PI2); g.arc(R*0.46,R*0.22,R*0.09,0,PI2); g.fill();
+    } else if(en.type==='scout'){
+      g.beginPath(); g.arc(0,0,R*0.82,0,PI2); g.fillStyle='#6b4a2e'; g.fill();
+      g.fillStyle='#20242e'; rr(g, R*0.02,-R*0.62,R*0.5,R*1.24,R*0.2); g.fill();
+      for(const s of [-1,1]){ g.beginPath(); g.arc(R*0.38,s*R*0.34,R*0.2,0,PI2); g.fillStyle='#0e1017'; g.fill();
+        eyeGlow(g, R*0.42, s*R*0.34, R*0.09, '#ffb066'); }
+      g.strokeStyle='#20242e'; g.lineWidth=R*0.1; g.beginPath(); g.moveTo(-R*0.5,-R*0.45); g.lineTo(-R*0.95,-R*0.8); g.stroke();
+    } else if(en.type==='tank'){
+      g.beginPath(); g.arc(0,0,R*0.88,0,PI2); g.fillStyle='#2c2418'; g.fill();
+      g.lineWidth=R*0.16; g.strokeStyle='#4a3a22'; g.stroke();
+      for(let i=0;i<6;i++){ const a=i/6*PI2; g.beginPath(); g.arc(Math.cos(a)*R*0.72,Math.sin(a)*R*0.72,R*0.07,0,PI2); g.fillStyle='#6b5330'; g.fill(); }
+      // páncél-jelvény: dupla chevron előre
+      g.strokeStyle='#f0d488'; g.lineWidth=R*0.14; g.lineJoin='round';
+      for(const off of [0.0,0.28]){ g.beginPath(); g.moveTo(R*(0.2+off),-R*0.34); g.lineTo(R*(0.5+off),0); g.lineTo(R*(0.2+off),R*0.34); g.stroke(); }
+    } else if(en.type==='sniper'){
+      g.beginPath(); g.arc(0,0,R*0.8,0,PI2); g.fillStyle='#25402f'; g.fill();
+      g.lineWidth=R*0.1; g.strokeStyle='#16281e'; g.stroke();
+      g.beginPath(); g.arc(R*0.42,0,R*0.34,0,PI2); g.fillStyle='#0e1017'; g.fill();
+      g.lineWidth=R*0.08; g.strokeStyle='#3ddc97'; g.beginPath(); g.arc(R*0.42,0,R*0.34,0,PI2); g.stroke();
+      g.strokeStyle='#5effb0'; g.lineWidth=R*0.05;
+      g.beginPath(); g.moveTo(R*0.42,-R*0.3); g.lineTo(R*0.42,R*0.3); g.moveTo(R*0.12,0); g.lineTo(R*0.72,0); g.stroke();
+      eyeGlow(g, R*0.42,0,R*0.06,'#5effb0');
+    } else if(en.type==='bomber'){
+      g.beginPath(); g.arc(0,0,R*0.82,0,PI2); g.fillStyle='#241318'; g.fill();
+      g.lineWidth=R*0.1; g.strokeStyle='#3a1d24'; g.stroke();
+      // gyújtózsinór hátul + szikra
+      g.strokeStyle='#7a5a2a'; g.lineWidth=R*0.1; g.beginPath(); g.moveTo(-R*0.6,-R*0.1); g.quadraticCurveTo(-R*1.0,-R*0.5,-R*0.85,-R*0.85); g.stroke();
+      eyeGlow(g, -R*0.85,-R*0.85, R*0.12, '#ffd24a');
+      // mérges szemek
+      g.fillStyle='#ff3b3b'; g.save(); g.shadowColor='#ff3b3b'; g.shadowBlur=R*0.6;
+      for(const s of [-1,1]){ g.beginPath(); g.moveTo(R*0.3,s*R*0.12); g.lineTo(R*0.62,s*R*0.36); g.lineTo(R*0.62,s*R*0.1); g.closePath(); g.fill(); }
+      g.restore();
+    } else if(en.type==='medic'){
+      g.beginPath(); g.arc(0,0,R*0.82,0,PI2); g.fillStyle='#e8f6ee'; g.fill();
+      g.lineWidth=R*0.12; g.strokeStyle='#3ddc97'; g.stroke();
+      g.fillStyle='#ff4d5e'; rr(g,-R*0.14,-R*0.42,R*0.28,R*0.84,R*0.06); g.fill();
+      rr(g,-R*0.42,-R*0.14,R*0.84,R*0.28,R*0.06); g.fill();
+    } else if(en.type==='charger'){
+      g.beginPath(); g.arc(0,0,R*0.78,0,PI2); g.fillStyle='#5a3a12'; g.fill();
+      g.lineWidth=R*0.1; g.strokeStyle='#3a2508'; g.stroke();
+      // előremutató szarvak
+      g.fillStyle='#e8a13a';
+      for(const s of [-1,1]){ g.beginPath(); g.moveTo(R*0.2,s*R*0.35); g.lineTo(R*1.05,s*R*0.55); g.lineTo(R*0.35,s*R*0.1); g.closePath(); g.fill(); }
+      g.fillStyle='#20242e'; rr(g, R*0.1,-R*0.16,R*0.5,R*0.32,R*0.06); g.fill();
+      eyeGlow(g, R*0.4,0,R*0.09,'#ffcf6a');
+    } else if(en.type==='turret'){
+      g.beginPath(); for(let i=0;i<6;i++){ const a=i/6*PI2+Math.PI/6; const px=Math.cos(a)*R*0.82, py=Math.sin(a)*R*0.82; i?g.lineTo(px,py):g.moveTo(px,py);} g.closePath();
+      g.fillStyle='#3a3a4a'; g.fill(); g.lineWidth=R*0.1; g.strokeStyle='#20202c'; g.stroke();
+      g.fillStyle='#20242e'; rr(g, R*0.2,-R*0.18,R*1.0,R*0.36,R*0.08); g.fill();
+      g.fillStyle='#12141b'; rr(g, R*1.05,-R*0.12,R*0.2,R*0.24,R*0.05); g.fill();
+      eyeGlow(g, 0,0,R*0.14,'#ff4d4d');
+    } else if(en.type==='swarmling'){
+      g.beginPath(); g.arc(0,0,R*0.85,0,PI2); g.fillStyle='#c94fa0'; g.fill();
+      g.strokeStyle='#7a2e63'; g.lineWidth=R*0.14;
+      for(const s of [-1,1]){ g.beginPath(); g.moveTo(R*0.3,s*R*0.2); g.quadraticCurveTo(R*0.9,s*R*0.4,R*1.1,s*R*0.15); g.stroke();
+        eyeGlow(g, R*1.1,s*R*0.15,R*0.1,'#ff9de0'); }
+      g.fillStyle='#1a0a16'; g.beginPath(); g.arc(R*0.4,-R*0.24,R*0.16,0,PI2); g.arc(R*0.4,R*0.24,R*0.16,0,PI2); g.fill();
+    } else {
+      g.beginPath(); g.arc(0,0,R*0.8,0,PI2); g.fillStyle='#39404e'; g.fill();
+    }
+  });
+}
+
+// --- típusonként ELTÉRŐ test-sziluett: alakról egy pillantás alatt felismerhető ---
+function drawEnemyBody(g, en, face){
+  const R = en.r;
+  const fill = en.frozen>0 ? '#bfe9ff' : (en.hitFlash>0 ? '#fff' : en.color);
+  g.save();
+  g.translate(en.x, en.y); g.rotate(face);
+  g.fillStyle = fill; g.lineWidth = R>20 ? 4 : 2; g.strokeStyle = 'rgba(0,0,0,0.35)';
+  if(en.type==='scout'){          // keskeny nyíl-ék: a gyors bekerítő
+    g.beginPath(); g.moveTo(R*1.25,0); g.lineTo(-R*0.85,R*0.9); g.lineTo(-R*0.45,0); g.lineTo(-R*0.85,-R*0.9); g.closePath();
+  } else if(en.type==='tank'){    // nagy nyolcszög-páncél: a lassú kolosszus
+    g.beginPath();
+    for(let i=0;i<8;i++){ const a=i/8*PI2+Math.PI/8; const px=Math.cos(a)*R*1.08, py=Math.sin(a)*R*1.08; i?g.lineTo(px,py):g.moveTo(px,py); }
+    g.closePath();
+  } else if(en.type==='sniper'){  // hosszúkás rombusz: a távoli lövész
+    g.beginPath(); g.moveTo(R*1.15,0); g.lineTo(0,R*0.7); g.lineTo(-R*1.15,0); g.lineTo(0,-R*0.7); g.closePath();
+  } else if(en.type==='bomber'){  // tüskés akna: messziről ordít, hogy robban
+    g.beginPath();
+    for(let i=0;i<16;i++){ const a=i/16*PI2; const rad=(i%2===0)?R*1.25:R*0.8;
+      const px=Math.cos(a)*rad, py=Math.sin(a)*rad; i?g.lineTo(px,py):g.moveTo(px,py); }
+    g.closePath();
+  } else if(en.type==='medic'){   // lekerekített négyzet: a mentődoboz
+    rr(g, -R*0.9, -R*0.9, R*1.8, R*1.8, R*0.32);
+  } else if(en.type==='charger'){ // vaskos ék előre: a rohamozó
+    g.beginPath(); g.moveTo(R*1.2,0); g.lineTo(-R*0.7,R*0.95); g.lineTo(-R*0.95,0); g.lineTo(-R*0.7,-R*0.95); g.closePath();
+  } else if(en.type==='turret'){  // szögletes talapzat: az álló ágyú
+    rr(g, -R*0.95, -R*0.95, R*1.9, R*1.9, R*0.16);
+  } else if(en.type==='swarmling'){ // apró csillag-blob: a rajlény
+    g.beginPath();
+    for(let i=0;i<10;i++){ const a=i/10*PI2; const rad=(i%2===0)?R*1.1:R*0.75;
+      const px=Math.cos(a)*rad, py=Math.sin(a)*rad; i?g.lineTo(px,py):g.moveTo(px,py); }
+    g.closePath();
+  } else {                        // grunt: az alap kör-katona
+    g.beginPath(); g.arc(0,0,R,0,PI2);
+  }
+  g.fill(); g.stroke();
+  g.restore();
+}
+
+// --- boss fej: démoni ---
+function drawBoss(g, b, face){
+  const R=b.r;
+  const col = b.col || '#ff5c7c';
+  // aura
+  g.beginPath(); g.arc(b.x,b.y,R,0,PI2);
+  g.fillStyle = b.hitFlash>0 ? '#fff' : (b.frozen>0 ? '#bfe9ff' : (b.isMini ? shade(col,-0.6) : shade(col,-0.78)));
+  g.shadowColor=col; g.shadowBlur=28; g.fill(); g.shadowBlur=0;
+  g.lineWidth=3; g.strokeStyle=col; g.stroke();
+  withRot(g, b.x, b.y, face, ()=>{
+    // korona-tüskék hátul/körben
+    g.fillStyle=shade(col,-0.85);
+    for(let i=0;i<7;i++){ const a=Math.PI*0.5 + (i-3)*0.5; g.beginPath();
+      g.moveTo(Math.cos(a-0.12)*R*0.7,Math.sin(a-0.12)*R*0.7);
+      g.lineTo(Math.cos(a)*R*1.15,Math.sin(a)*R*1.15);
+      g.lineTo(Math.cos(a+0.12)*R*0.7,Math.sin(a+0.12)*R*0.7); g.closePath(); g.fill(); }
+    // előre görbülő szarvak (a boss típusa szerint eltérő árnyalat)
+    g.fillStyle = b.type==='frost' ? '#e6f4ff' : (b.type==='flame' ? '#ffe0b0' : '#e8e2ea');
+    for(const s of [-1,1]){ g.beginPath(); g.moveTo(R*0.1,s*R*0.5); g.quadraticCurveTo(R*1.2,s*R*0.7,R*1.25,s*R*0.15);
+      g.quadraticCurveTo(R*0.9,s*R*0.4,R*0.35,s*R*0.2); g.closePath(); g.fill(); }
+    // ragyogó szemek
+    g.save(); g.shadowColor=col; g.shadowBlur=R*0.9; g.fillStyle=shade(col,0.25);
+    for(const s of [-1,1]){ g.beginPath(); g.ellipse(R*0.4, s*R*0.28, R*0.2, R*0.12, 0,0,PI2); g.fill(); }
+    g.restore();
+    // fogazott száj
+    g.strokeStyle=shade(col,0.4); g.lineWidth=R*0.05; g.beginPath();
+    for(let i=0;i<=6;i++){ const yy=(-0.3+i*0.1)*R; const xx=R*(0.62+ (i%2?0.08:0)); i?g.lineTo(xx,yy):g.moveTo(xx,yy);} g.stroke();
+  });
+}
+
+// --- érintős botkormányok kirajzolása ---
+function drawStick(g, s, col){
+  g.save();
+  g.globalAlpha=0.18; g.beginPath(); g.arc(s.baseX,s.baseY,STICK_MAX,0,PI2); g.fillStyle=col; g.fill();
+  g.globalAlpha=0.5; g.lineWidth=2; g.strokeStyle=col; g.stroke();
+  g.globalAlpha=0.95; g.beginPath(); g.arc(s.kx,s.ky,26,0,PI2); g.fillStyle=col;
+  g.shadowColor=col; g.shadowBlur=16; g.fill(); g.shadowBlur=0;
+  g.restore();
+}
+function drawStickHint(g, x, y, col, label){
+  g.save(); g.globalAlpha=0.14; g.beginPath(); g.arc(x,y,54,0,PI2); g.lineWidth=3; g.strokeStyle=col; g.stroke();
+  g.globalAlpha=0.25; g.beginPath(); g.arc(x,y,18,0,PI2); g.fillStyle=col; g.fill();
+  g.globalAlpha=0.35; g.font='11px Trebuchet MS'; g.fillStyle=col; g.textAlign='center'; g.fillText(label,x,y+40);
+  g.restore();
+}
+/* =========================================================
+   MENÜ UI
+   ========================================================= */
+const colorRow = document.getElementById('colorRow');
+COLORS.forEach((c,i)=>{
+  const sw = document.createElement('div');
+  sw.className = 'swatch' + (i===0 ? ' selected' : '');
+  sw.style.background = c;
+  sw.addEventListener('click', ()=>{
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
+    sw.classList.add('selected'); chosenColor = c; renderHeadOptions(); drawPreview();
+  });
+  colorRow.appendChild(sw);
+});
+
+const headRow = document.getElementById('headRow');
+function renderHeadOptions(){
+  headRow.innerHTML='';
+  PLAYER_HEADS.forEach(h=>{
+    const cv = document.createElement('canvas'); cv.width=62; cv.height=62;
+    cv.className = 'headOpt' + (h.id===chosenHead ? ' selected' : '');
+    const c = cv.getContext('2d');
+    c.clearRect(0,0,62,62);
+    drawPlayerHead(c, 31, 33, 23, -Math.PI/2, h.id, chosenColor);
+    cv.title = h.label;
+    cv.addEventListener('click', ()=>{ chosenHead=h.id; renderHeadOptions(); drawPreview(); });
+    headRow.appendChild(cv);
+  });
+}
+renderHeadOptions();
+
+const diffRow = document.getElementById('diffRow');
+function renderDiffOptions(){
+  diffRow.innerHTML='';
+  Object.values(DIFFICULTIES).forEach(d=>{
+    const b = document.createElement('div');
+    b.className = 'diffBtn' + (d.key===chosenDifficulty ? ' selected' : '');
+    b.style.setProperty('--diffcol', d.col);
+    b.innerHTML = `${d.label}<small>${d.desc}</small>`;
+    b.addEventListener('click', ()=>{ chosenDifficulty=d.key; renderDiffOptions(); });
+    diffRow.appendChild(b);
+  });
+}
+renderDiffOptions();
+
+const pv = document.getElementById('previewCanvas');
+const pvCtx = pv.getContext('2d');
+function drawPreview(){
+  pvCtx.clearRect(0,0,110,110);
+  const p = { x:55, y:60, r:26, color:chosenColor, head:chosenHead, facing:-Math.PI/2, invuln:0, surgeActive:0, name:'' };
+  drawPlayer(pvCtx, p);
+}
+drawPreview();
+
+// ---- Profil ----
+function renderProfile(){
+  document.getElementById('profLvl').textContent = profileLevel();
+  document.getElementById('profXpTxt').textContent = (profile.xp||0);
+  const into = (profile.xp||0) % PROFILE_STEP;
+  document.getElementById('profXpFill').style.width = (into/PROFILE_STEP*100) + '%';
+}
+
+// ---- Class kártyák ----
+const classRow = document.getElementById('classRow');
+function setClass(id){ chosenClass=id; equipDefaults(); renderClassCards(); buildLoadoutUI(); }
+function renderClassCards(){
+  classRow.innerHTML='';
+  Object.entries(CLASSES).forEach(([id,c])=>{
+    const unlocked = isClassUnlocked(id);
+    const bal = heroBalanceMult(id);
+    let balTag = '';
+    if(bal.hp<0.995 || bal.dmg<0.995) balTag = `<div class="cLine" style="color:#ff8a9d;">▼ finomhangolva (népszerű): ${Math.round((bal.hp+bal.dmg)/2*100)}%</div>`;
+    else if(bal.hp>1.005 || bal.dmg>1.005) balTag = `<div class="cLine" style="color:#7dffb0;">▲ finomhangolva (ritkán játszott): ${Math.round((bal.hp+bal.dmg)/2*100)}%</div>`;
+    const sealedTag = c.sealed ? `<div class="cLine" style="color:#ffd166;">🔯 örökre a legerősebb — sosem gyengül</div>` : '';
+    const card = document.createElement('div');
+    card.className = 'classCard' + (id===chosenClass?' selected':'') + (unlocked?'':' locked') + (c.sealed?' sealedCard':'');
+    card.style.setProperty('--ccol', c.col);
+    card.innerHTML =
+      `<div class="cName">${c.icon} ${c.label}</div><div class="cRole">${c.role}</div>`+
+      `<div class="cLine"><span class="g">▲</span> ${c.strong}</div>`+
+      `<div class="cLine"><span class="b">▼</span> ${c.weak}</div>`+
+      `<div class="cUlt">${ULTIMATES[c.ult].icon} ${ULTIMATES[c.ult].label}</div>`+
+      sealedTag + balTag +
+      (unlocked?'':`<div class="lockTag">🔒 Lv.${c.req}</div>`);
+    if(unlocked) card.addEventListener('click', ()=>setClass(id));
+    classRow.appendChild(card);
+  });
+}
+
+// ---- Sztori mód: képernyő-router + fejezet-választó + intro ----
+const SCREENS = ['startScreen','mapScreen','storyIntro','pauseScreen','bossIntro','winScreen','deathScreen','authScreen'];
+function showScreen(id){
+  SCREENS.forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('hidden', s!==id); });
+  // képernyőváltáskor, ha kontroller van, azonnal jelölje ki az első elemet — ne kelljen
+  // "belelépni" a navigációba, az első gombnyomás már tényleg aktiváljon valamit
+  setPadFocus(pad.connected ? (padFocusables()[0] || null) : null);
+}
+function renderMapCards(){
+  const row = document.getElementById('mapRow'); if(!row) return; row.innerHTML='';
+  const prog = profile.storyProgress||0;
+  const done = profile.storyDone||[];
+  CHAPTERS.forEach((ch,i)=>{
+    const unlocked = TEST_MODE_UNLOCK_ALL || isAdminUser() || i <= prog;
+    const cleared = done.includes(ch.id);
+    const card = document.createElement('div');
+    card.className = 'classCard' + (i===selectedChapter?' selected':'') + (unlocked?'':' locked');
+    card.style.setProperty('--ccol', ch.boss.col);
+    card.innerHTML =
+      `<div class="cName">${i+1}. ${ch.title}</div>`+
+      `<div class="cRole">${ch.seal}</div>`+
+      `<div class="cLine">${ch.goal}</div>`+
+      (cleared?`<div class="cUlt">✓ Pecsét megerősítve</div>`:'')+
+      (unlocked?'':`<div class="lockTag">🔒</div>`);
+    if(unlocked) card.addEventListener('click', ()=>{ selectedChapter=i; renderMapCards(); showScreen('storyIntro'); renderStoryIntro(); });
+    row.appendChild(card);
+  });
+}
+function renderStoryIntro(){
+  const ch = CHAPTERS[selectedChapter]; if(!ch) return;
+  document.getElementById('storyTitle').textContent = ch.title;
+  document.getElementById('storyText').innerHTML =
+    `<div style="color:var(--gold);letter-spacing:2px;font-size:12px;margin-bottom:8px;">${ch.seal.toUpperCase()}</div>`+
+    ch.intro +
+    `<div style="margin-top:12px;color:var(--accent);">🎯 ${ch.goal}</div>`;
+}
+
+// ---- Loadout (képességrács + slotok + billentyűk) ----
+const abilityGrid = document.getElementById('abilityGrid');
+const slotRow = document.getElementById('slotRow');
+function ensureKey(id){ if(!abilityKeys[id] || usedKeys(id).has(abilityKeys[id])) abilityKeys[id]=freeDefaultKey(); }
+function equipDefaults(){
+  equipped = CLASSES[chosenClass].def.filter(id=>isAbilityUnlocked(id)).slice(0,MAX_SLOTS);
+  equipped.forEach(ensureKey);
+}
+function toggleEquip(id){
+  const i = equipped.indexOf(id);
+  if(i>=0){ equipped.splice(i,1); }
+  else if(equipped.length<MAX_SLOTS){ equipped.push(id); ensureKey(id); }
+  buildLoadoutUI();
+}
+function buildLoadoutUI(){
+  abilityGrid.innerHTML='';
+  const clsData = CLASSES[chosenClass];
+  Object.entries(ABILITIES).forEach(([id,ab])=>{
+    if(ab.cls && ab.cls!==chosenClass && !(clsData && clsData.allAbilities)) return; // más hős kizárólagos pecsétje — ne is látszódjon
+    const unlocked = isAbilityUnlocked(id);
+    const idx = equipped.indexOf(id);
+    const abal = abilityBalanceMult(id);
+    const cell = document.createElement('div');
+    cell.className = 'abCell' + (idx>=0?' equipped':'') + (unlocked?'':' locked') + (ab.epic?' epicCell':'') + (ab.legendary?' legendaryCell':'');
+    cell.title = ab.label + ' — ' + ab.desc + (abal<0.995?` (finomhangolva: ${Math.round(abal*100)}%)`:'');
+    cell.innerHTML = (ab.epic?`<div class="epicTag">EPIKUS · max 10. rang</div>`:'') +
+      (ab.legendary?`<div class="epicTag legendaryTag">LEGENDÁS · max 10. rang</div>`:'') +
+      (abal<0.995?`<div class="nerfDot" title="finomhangolva">▼</div>`:'') +
+      `<div class="ic">${ab.icon}</div><div class="nm">${ab.label}</div>`+
+      (idx>=0?`<div class="slotNum">${idx+1}</div>`:'') + (unlocked?'':`<div class="lk">🔒${ab.req}</div>`);
+    if(unlocked) cell.addEventListener('click', ()=>toggleEquip(id));
+    abilityGrid.appendChild(cell);
+  });
+  slotRow.innerHTML='';
+  for(let i=0;i<MAX_SLOTS;i++){
+    const id = equipped[i];
+    const chip = document.createElement('div'); chip.className='slotChip';
+    chip.innerHTML = `<span>${i+1}. ${id?ABILITIES[id].icon:'—'}</span>`;
+    if(id){
+      const kb = document.createElement('div');
+      kb.className = 'keyBtn' + (listeningSlot===id?' listening':'') + (abilityKeys[id]?'':' unbound');
+      kb.textContent = listeningSlot===id ? '…' : (displayKey(abilityKeys[id]) || '—');
+      kb.addEventListener('click', ()=>{ listeningSlot=id; buildLoadoutUI(); });
+      chip.appendChild(kb);
+    }
+    slotRow.appendChild(chip);
+  }
+  const ult = ULTIMATES[CLASSES[chosenClass].ult];
+  const uchip = document.createElement('div'); uchip.className='slotChip ult';
+  uchip.innerHTML = `<span>ULT ${ult.icon}</span>`;
+  const ukb = document.createElement('div');
+  ukb.className = 'keyBtn' + (listeningSlot==='ult'?' listening':'') + (ultKey?'':' unbound');
+  ukb.textContent = listeningSlot==='ult' ? '…' : (displayKey(ultKey) || '—');
+  ukb.addEventListener('click', ()=>{ listeningSlot='ult'; buildLoadoutUI(); });
+  uchip.appendChild(ukb); slotRow.appendChild(uchip);
+  document.getElementById('abilityHint').innerHTML =
+    `Felszerelve: <b>${equipped.length}/5</b> · Kattints egy képességre a fel-/leszereléshez, `+
+    `a billentyű-gombra kattintva átállíthatod (érintőn a képességre bökve használod).`;
+}
+function refreshMenu(){ renderProfile(); renderClassCards(); buildLoadoutUI(); }
+
+equipDefaults();
+refreshMenu();
+
+const IS_COARSE = window.matchMedia('(pointer:coarse)').matches;
+document.getElementById('controlsHint').innerHTML = (IS_COARSE
+  ? `Bal fél — mozgás, jobb fél — célzás és <b>folyamatos lövés</b>. Alul a képesség-ikonokra, jobbra az ULT gombra bökve harcolsz. Fent ⏸ = szünet.`
+  : `WASD / nyilak — mozgás &nbsp;|&nbsp; Egér — célzás, bal katt — lövés &nbsp;|&nbsp; a felszerelt képességek a beállított billentyűkön, ULT: ${displayKey(ultKey)} &nbsp;|&nbsp; P / Esc — szünet<br>`+
+    `Érintőn: bal fél mozgat, jobb fél céloz és lő, az ikonokra bökve használod a képességeket.`)
+  + `<br>Kontroller (Xbox/PS): bal kar — mozgás, jobb kar — célzás+lövés (RT/R2 is lő), A·B·X·Y·LB — képességek, RB — ULT, Start — szünet.<br>`
+  + `Menüben: d-pad / bal kar — lépkedés, A — kiválasztás, B — vissza.`;
+
+/* =========================================================
+   ELLENFÉL-DEFINÍCIÓK
+   ========================================================= */
+const ENEMY_DEFS = {
+  grunt:    { r:16, hp:33, dmg:12, speed:0.95, kind:'melee', color:'#8b6bff' },
+  scout:    { r:11, hp:15, dmg:7,  speed:1.75, kind:'melee', color:'#ff8a5c' },
+  tank:     { r:26, hp:98, dmg:20, speed:0.55, kind:'melee', color:'#a17a52' },
+  sniper:   { r:12, hp:19, dmg:13, speed:0.85, kind:'ranged', color:'#3ddc97', range:380 },
+  bomber:   { r:17, hp:25, dmg:28, speed:1.05, kind:'bomber', color:'#ff4d4d' },
+  medic:    { r:15, hp:23, dmg:0,  speed:0.9,  kind:'medic', color:'#8affc1', range:320 },
+  charger:  { r:15, hp:31, dmg:17, speed:1.1,  kind:'charger', color:'#ffb347' },
+  turret:   { r:22, hp:63, dmg:14, speed:0,    kind:'ranged', color:'#6a6a8a', range:420 },
+  swarmling:{ r:9,  hp:11, dmg:6,  speed:1.7,  kind:'melee', color:'#ff6ec7', splits:true },
+};
+const UNLOCK_WAVE = { grunt:1, scout:1, tank:3, sniper:4, bomber:5, charger:6, medic:7, turret:8, swarmling:9 };
+function poolForWave(w){ return Object.keys(UNLOCK_WAVE).filter(t => UNLOCK_WAVE[t] <= w); }
+
+/* =========================================================
+   SZTORI MÓD — "A Kilenc Pecsét" hadjárat (adatvezérelt)
+   Minden fejezet = egy pecsét: saját pálya, ellenfél-készlet és boss.
+   Koordináták normalizáltak (nx,ny 0..1), futásidőben a képernyőre skálázva.
+   (Első játszható szelet: 3 fejezet a kilencből.)
+   ========================================================= */
+const CHAPTERS = [
+  {
+    id:'city', title:'A Megszállt Város', seal:'Az Első Pecsét',
+    intro:'A Sötétség betört a világba a feltört pecséteken át. A romváros utcáit szörnyek lepték el, '+
+          'a pecsét kövét pedig egy rém őrzi. Törd át a hordákat, és erősítsd meg az Első Pecsétet.',
+    goal:'Élj túl 6 hullámot, majd győzd le a Városi Rémet.',
+    waveCount:6, enemyPool:['grunt','scout','charger','bomber'],
+    theme:{ bg:'#0a0e14', gridColor:'rgba(110,231,255,0.05)', obstacleFill:'#2a3348', obstacleFill2:'#333f58', obstacleStroke:'#454f6b' },
+    obstacles:[ {nx:0.22,ny:0.28,r:34},{nx:0.80,ny:0.72,r:38},{nx:0.78,ny:0.24,r:28},{nx:0.20,ny:0.75,r:30} ],
+    covers:[ {nx:0.5,ny:0.20,r:26,hp:80},{nx:0.5,ny:0.80,r:26,hp:80} ],
+    barrels:[ {nx:0.35,ny:0.35},{nx:0.65,ny:0.66},{nx:0.68,ny:0.34} ],
+    hazards:[ {nx:0.14,ny:0.5,r:50,dps:0.35,kind:'shock'} ],
+    crates:[ {nx:0.5,ny:0.12,loot:'heal'} ],
+    boss:{ name:'A Városi Rém', type:'shadow', hp:520, r:46, speed:1.2, col:'#ff5c7c', fireRate:1.0, patterns:['spread','aimed'],
+      intro:'"Ez a város már a miénk — ahogy a pecsét is."<br><br>A romok közül eléd magasodik a Városi Rém. Az utolsó hullám leverve; most vagy soha.' },
+  },
+  {
+    id:'frost', title:'A Fagyott Kapu', seal:'A Második Pecsét',
+    intro:'A hegyi kapun túl örök tél uralkodik. A jég alá fagyott pecsétet a Fagy Őrzője vigyázza, '+
+          'és a talaj maga is dermeszt. Vigyázz, hol lépsz — a fagyzónák lelassítanak és sebeznek.',
+    goal:'Élj túl 7 hullámot, kerüld a jégzónákat, és győzd le a Fagy Őrzőjét.',
+    waveCount:7, enemyPool:['grunt','scout','tank','sniper'],
+    theme:{ bg:'#0b1420', gridColor:'rgba(150,200,255,0.06)', obstacleFill:'#243347', obstacleFill2:'#324a63', obstacleStroke:'#5a7aa0' },
+    obstacles:[ {nx:0.25,ny:0.30,r:32},{nx:0.75,ny:0.30,r:32},{nx:0.25,ny:0.70,r:32},{nx:0.75,ny:0.70,r:32} ],
+    covers:[ {nx:0.5,ny:0.22,r:26,hp:90,col:'#4a6a8a'},{nx:0.5,ny:0.78,r:26,hp:90,col:'#4a6a8a'} ],
+    barrels:[ {nx:0.18,ny:0.5},{nx:0.82,ny:0.5} ],
+    hazards:[ {nx:0.28,ny:0.5,r:54,dps:0.30,kind:'ice'},{nx:0.72,ny:0.5,r:54,dps:0.30,kind:'ice'} ],
+    crates:[ {nx:0.5,ny:0.14,loot:'ult'},{nx:0.12,ny:0.86,loot:'xp'} ],
+    boss:{ name:'A Fagy Őrzője', type:'frost', hp:680, r:48, speed:1.15, col:'#7fd8ff', fireRate:1.05, patterns:['spread','aimed'],
+      intro:'"A hideg mindent eltemet. Téged is."<br><br>Dermesztő szélörvényként ereszkedik le a Fagy Őrzője. A pecsét a jég alatt vár.' },
+  },
+  {
+    id:'flame', title:'A Tűz Katakombái', seal:'A Harmadik Pecsét',
+    intro:'A mélyben izzó katakombák nyílnak, ahol a láva folyói között a Harmadik Pecsét lángol. '+
+          'A Láng Ura nem enged közel — a robbanó hordók viszont a te fegyvereid is lehetnek.',
+    goal:'Élj túl 8 hullámot a láva között, és győzd le a Láng Urát.',
+    waveCount:8, enemyPool:['grunt','charger','bomber','tank','swarmling'],
+    theme:{ bg:'#150a08', gridColor:'rgba(255,140,60,0.06)', obstacleFill:'#3a241c', obstacleFill2:'#4a2f22', obstacleStroke:'#6b3a2a' },
+    obstacles:[ {nx:0.20,ny:0.25,r:30},{nx:0.80,ny:0.75,r:30},{nx:0.22,ny:0.78,r:26},{nx:0.80,ny:0.22,r:26} ],
+    covers:[ {nx:0.5,ny:0.20,r:24,hp:70,col:'#5a3a24'},{nx:0.5,ny:0.80,r:24,hp:70,col:'#5a3a24'} ],
+    barrels:[ {nx:0.35,ny:0.70},{nx:0.65,ny:0.30},{nx:0.50,ny:0.62},{nx:0.16,ny:0.5} ],
+    hazards:[ {nx:0.25,ny:0.55,r:52,dps:0.55,kind:'lava'},{nx:0.75,ny:0.45,r:52,dps:0.55,kind:'lava'},{nx:0.5,ny:0.28,r:44,dps:0.5,kind:'lava'} ],
+    crates:[ {nx:0.5,ny:0.13,loot:'heal'},{nx:0.88,ny:0.5,loot:'ult'} ],
+    boss:{ name:'A Láng Ura', type:'flame', hp:880, r:50, speed:1.25, col:'#ff6a2a', fireRate:0.92, patterns:['spread','aimed','spiral'],
+      intro:'"Én vagyok a tűz, ami felemészti a világot!"<br><br>Lángba borulva emelkedik ki a lávából a Láng Ura. A harmadik pecsét sorsa a kezedben.' },
+  },
+];
+let selectedChapter = 0;     // épp kiválasztott/aktív fejezet indexe
+let startMode = 'campaign';  // 'campaign' | 'story' — a resetGame ezt olvassa
+
+/* =========================================================
+   KARAKTER / JÁTÉK LÉTREHOZÁSA
+   ========================================================= */
+function makePlayer(name, color, head){
+  const cls = CLASSES[chosenClass] || CLASSES.tank;
+  const bal = cls.sealed ? {hp:1,dmg:1} : heroBalanceMult(chosenClass);   // a pecsételt hőst sosem érinti a finomhangolás
+  return {
+    name, color, head, cls:chosenClass, x:0, y:0, r:18,
+    speed:cls.speed, vx:0, vy:0, _px:0, _py:0,
+    hp:Math.round(cls.hp*bal.hp), maxHp:Math.round(cls.hp*bal.hp), level:1, xp:0, xpNext:60,
+    facing:0,
+    fireCooldown:0, fireRate:cls.fireRate,
+    bulletDmg:Math.round(cls.bulletDmg*bal.dmg), bulletSpeed:cls.bulletSpeed, bulletCount:cls.bulletCount||1,
+    armor:cls.armor||0, regen:cls.regen||0, critChance:cls.critChance||0, lowHpDmg:cls.lowHpDmg||0, cdScale:cls.cdScale||1,
+    powerDamp: cls.allAbilities ? 0.7 : 1,   // minden pecsétet ismer, de mindegyiket gyengébben használja
+    dashing:0, shieldActive:0, surgeActive:0, invuln:0, hazSlow:0,
+    buffs:{ lifesteal:0, berserk:0, multishot:0, precision:0, invisible:0, berserkUlt:0, boneward:0 },
+    abilities: equipped.slice(0,MAX_SLOTS).map(id=>({ id, key:(abilityKeys[id]||'').toLowerCase(), cd:0, rank:1 })),
+    ult: { id:cls.ult, key:(ultKey||'').toLowerCase(), charge:0, chargeMax:ULTIMATES[cls.ult].chargeMax },
+  };
+}
+
+function resetGame(){
+  const name = document.getElementById('nameInput').value.trim() || 'Hős';
+  const story = (startMode==='story');
+  recordHeroPlay(chosenClass);
+  game = {
+    player: makePlayer(name, chosenColor, chosenHead),
+    bullets:[], enemyBullets:[], enemies:[], particles:[], orbs:[], fireballs:[], turrets:[], meteors:[], obstacles:[],
+    clouds:[], drones:[], beams:[], traps:[], slowT:0,
+    barrels:[], hazards:[], crates:[],
+    pendingSpawns:[],
+    wave:1, waveTimer:70, spawning:true,
+    boss:null, endless:false,
+    mode: startMode,
+    chapterIndex: story ? selectedChapter : 0,
+    chapter: story ? (CHAPTERS[selectedChapter] || null) : null,
+    chapterWave: 1,
+    diff: DIFFICULTIES[chosenDifficulty] || DIFFICULTIES.normal,
+    state:'playing',
+  };
+  const p = game.player;
+  p.x = canvas.width/2; p.y = canvas.height/2; p._px=p.x; p._py=p.y;
+  resetSticks();
+  buildAbilityBar();
+  if(game.chapter) loadChapterLayout(game.chapter);
+  else generateObstacles();
+  spawnWave();
+  game.waveTimer = waveInterval();
+  startMusic(game.chapter ? game.chapter.id : 'default');
+}
+
+/* Fejezet pálya-elrendezésének betöltése (akadály/fedezék/hordó/veszély/láda) */
+function loadChapterLayout(ch){
+  const w=canvas.width, h=canvas.height;
+  game.obstacles = [];
+  (ch.obstacles||[]).forEach(o=> game.obstacles.push({ nx:o.nx, ny:o.ny, x:o.nx*w, y:o.ny*h, r:o.r }));
+  (ch.covers||[]).forEach(o=> game.obstacles.push({ nx:o.nx, ny:o.ny, x:o.nx*w, y:o.ny*h, r:o.r,
+    destructible:true, hp:o.hp||90, maxHp:o.hp||90, dcol:o.col||'#6b563a' }));
+  game.barrels = (ch.barrels||[]).map(o=>({ nx:o.nx, ny:o.ny, x:o.nx*w, y:o.ny*h, r:o.r||15, hp:o.hp||1, blast:o.blast||120, dmg:o.dmg||55 }));
+  game.hazards = (ch.hazards||[]).map(o=>({ nx:o.nx, ny:o.ny, x:o.nx*w, y:o.ny*h, r:o.r||60, dps:o.dps||0.4, kind:o.kind||'lava', ph:0 }));
+  game.crates  = (ch.crates ||[]).map(o=>({ nx:o.nx, ny:o.ny, x:o.nx*w, y:o.ny*h, r:o.r||14, hp:o.hp||18, loot:o.loot||'xp' }));
+}
+// ablakméret-/orientációváltáskor a normalizált propok újrapozicionálása (állapot megőrzésével)
+function relayoutChapter(){
+  if(!game || !game.chapter) return;
+  const w=canvas.width, h=canvas.height;
+  const re=o=>{ if(o.nx!==undefined){ o.x=o.nx*w; o.y=o.ny*h; } };
+  game.obstacles.forEach(re); game.barrels.forEach(re); game.hazards.forEach(re); game.crates.forEach(re);
+  const p=game.player; if(p){ p.x=clamp(p.x,p.r,w-p.r); p.y=clamp(p.y,safeTop+p.r*0.5,h-safeBottom-p.r*0.5); }
+}
+
+/* Robbanó hordó felrobbanása — ellenfelet+bosst sebez, játékost is (ha közel és sebezhető), láncol */
+function explodeBarrel(bar){
+  bar.dead = true;
+  const R = bar.blast||120, DMG = bar.dmg||55, p = game.player;
+  aoeDamage(bar.x, bar.y, R, DMG, '#ff8c3c');
+  knockback(bar.x, bar.y, R, 10);
+  addParticles(bar.x, bar.y, '#ff8c3c', 40); addParticles(bar.x, bar.y, '#ffd24a', 20);
+  SFX.explosion(true);
+  if(p && p.invuln<=0 && p.shieldActive<=0 && dist(p.x,p.y,bar.x,bar.y) < R+p.r){
+    const armorFactor = clamp(1-(p.armor||0)+(p.buffs.berserk>0?0.2:0)-(p.buffs.boneward>0?0.35:0), 0.15, 2);
+    p.hp -= DMG*0.35*armorFactor; p.invuln=12; addParticles(p.x,p.y,'#ff5c7c',6);
+  }
+  // láncrobbanás: a közeli hordók is felrobbannak
+  game.barrels.forEach(o=>{ if(!o.dead && o!==bar && dist(o.x,o.y,bar.x,bar.y) < R+o.r) o.hp=0; });
+}
+
+/* Láda kinyitása — rejtett bónusz (gyógyulás / ult-töltés / XP) */
+function dropLoot(cr){
+  const p = game.player;
+  addParticles(cr.x, cr.y, '#ffd166', 26); SFX.crate();
+  if(cr.loot==='heal'){ p.hp = Math.min(p.maxHp, p.hp + p.maxHp*0.35); addParticles(cr.x,cr.y,'#8affc1',16); }
+  else if(cr.loot==='ult'){ addUltCharge(p.ult ? p.ult.chargeMax*0.5 : 0); }
+  else { game.orbs.push({ x:cr.x, y:cr.y, xp:40, r:7, t:0 }); }
+}
+
+function generateObstacles(){
+  const w=canvas.width, h=canvas.height;
+  const cx=canvas.width/2, cy=canvas.height/2;
+  const n = 8 + Math.floor(Math.random()*5);
+  game.obstacles = [];
+  let tries=0;
+  while(game.obstacles.length < n && tries < 260){
+    tries++;
+    const r = 22 + Math.random()*30;
+    const x = 60+r + Math.random()*(w-120-2*r);
+    const y = 60+r + Math.random()*(h-120-2*r);
+    if(Math.hypot(x-cx,y-cy) < 170) continue;
+    let ok = true;
+    for(const o of game.obstacles){ if(Math.hypot(x-o.x,y-o.y) < r+o.r+34){ ok=false; break; } }
+    if(ok) game.obstacles.push({x,y,r});
+  }
+}
+
+// időzített hullámok: a következő hullám ennyi frame múlva jön (a játék előrehaladtával rövidül)
+function waveInterval(){
+  return Math.max(400, 1050 - game.wave*46);   // ~17,5s-ról fokozatosan ~6,7s-ra — gyorsabban szorít
+}
+// az utolsó rendes hullám kiment-e már (utána a pálya megtisztítása hozza a bosst)
+function isFinalWaveOut(){
+  return game.mode==='story'
+    ? (game.chapter && game.chapterWave >= game.chapter.waveCount)
+    : (!game.endless && game.wave >= MAX_WAVES);
+}
+
+function spawnWave(){
+  SFX.wave();
+  const ch = game.chapter;
+  const pool = ch ? ch.enemyPool : poolForWave(game.wave);
+  // story módban a fejezeten belüli hullám vezérli a mennyiséget (kezelhető tempó),
+  // a stat-skálát viszont a monoton game.wave adja (fokozódó nehézség végig)
+  const wn = ch ? game.chapterWave : game.wave;
+  const cmul = (ch && ch.countMul) ? ch.countMul : 1;
+  // kicsit kevesebb ellenfél hullámonként, mert az időzített hullámok átfedhetnek
+  const count = Math.max(3, Math.round((5 + wn*2.2) * game.diff.count * cmul));
+  for(let i=0;i<count;i++){
+    game.pendingSpawns.push({ type: pool[Math.floor(Math.random()*pool.length)], timer: 8 + i*36 });
+  }
+}
+
+function spawnEnemyType(type, forcedX, forcedY, hpMult=1, rMult=1){
+  const def = ENEMY_DEFS[type];
+  const dif = game.diff;
+  const w=canvas.width, h=canvas.height;
+  let x=forcedX, y=forcedY;
+  if(x===undefined){
+    if(type==='turret'){
+      // az álló ágyú MINDIG a látható képernyőn belül jelenik meg (sosem képernyőn kívül),
+      // a játékostól távolabb, jól látható spawn-jelzéssel
+      const p2 = game.player, m = 70;
+      let tries = 0;
+      do{
+        x = m + Math.random()*(w - 2*m);
+        y = m + Math.random()*(h - 2*m);
+        tries++;
+      } while(tries < 40 && p2 && dist(x, y, p2.x, p2.y) < 220);
+      addParticles(x, y, def.color, 20);
+    } else {
+      const edge = Math.floor(Math.random()*4);
+      if(edge===0){ x=-30; y=Math.random()*h; }
+      else if(edge===1){ x=w+30; y=Math.random()*h; }
+      else if(edge===2){ x=Math.random()*w; y=-30; }
+      else { x=Math.random()*w; y=h+30; }
+    }
+  }
+  const scale = (1 + game.wave*0.06) * (game.chapter ? (game.chapter.enemyScale||1) : 1);
+  game.enemies.push({
+    type, x, y, r: def.r*rMult,
+    hp: Math.round(def.hp*scale*hpMult*dif.hp), maxHp: Math.round(def.hp*scale*hpMult*dif.hp),
+    dmg: Math.round(def.dmg*(1+game.wave*0.03)*dif.dmg),
+    speed: def.speed*dif.speed, kind: def.kind, color: def.color,
+    range: def.range||0, splits: !!def.splits, isChild: !!(hpMult<1),
+    hitFlash:0, atkTimer: Math.random()*60, chargeState:0, chargeAng:0, telegraph:0,
+    strafe: Math.random()<0.5?1:-1, strafeTimer: 40+Math.random()*60,
+  });
+}
+
+function spawnBoss(isMini){
+  const dm = game.diff.hp;
+  const bd = (!isMini && game.chapter) ? game.chapter.boss : null;   // fejezet-boss adat
+  const lvl = game.player.level;
+  game.boss = {
+    isMini: !!isMini,
+    type: bd ? (bd.type||'shadow') : 'shadow',
+    col:  bd ? (bd.col||'#ff5c7c') : (isMini ? '#ff8ab0' : '#ff5c7c'),
+    name: bd ? bd.name : 'A Gonosz Árnyék',
+    patterns: bd ? (bd.patterns||['spread','aimed']) : ['spread','aimed'],
+    fireRate: bd ? (bd.fireRate||1) : 1,
+    x: canvas.width/2, y: 140, r: bd ? (bd.r||46) : (isMini? 34:46),
+    hp: Math.round((bd ? (bd.hp + lvl*16) : (isMini ? (220+game.wave*14) : (480+lvl*20))) * dm),
+    maxHp: 0, speed: (bd ? bd.speed : (isMini?1.4:1.2))*game.diff.speed, attackTimer:0, hitFlash:0, frozen:0,
+    spiralAng:0,
+  };
+  game.boss.maxHp = game.boss.hp;
+}
+
+/* =========================================================
+   AI SEGÉDFÜGGVÉNYEK — "élethűbb" viselkedés
+   ========================================================= */
+// térbeli rács a szomszéd-kereséshez, hogy a separation/medic O(n) legyen
+const GRID_CELL = 96;
+function buildEnemyGrid(){
+  const grid = new Map();
+  for(const en of game.enemies){
+    const key = Math.floor(en.x/GRID_CELL)+','+Math.floor(en.y/GRID_CELL);
+    let c = grid.get(key); if(!c){ c=[]; grid.set(key,c); } c.push(en);
+  }
+  return grid;
+}
+function gridNeighbors(x, y){
+  const out=[]; const grid=game._egrid; if(!grid) return out;
+  const gx=Math.floor(x/GRID_CELL), gy=Math.floor(y/GRID_CELL);
+  for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){
+    const c=grid.get((gx+i)+','+(gy+j)); if(c) for(const e of c) out.push(e);
+  }
+  return out;
+}
+function separation(en, strength){
+  let sx=0, sy=0;
+  for(const o of gridNeighbors(en.x, en.y)){
+    if(o===en) continue;
+    const dx=en.x-o.x, dy=en.y-o.y, d2=dx*dx+dy*dy, rr2=(en.r+o.r)*1.5;
+    if(d2>0.01 && d2 < rr2*rr2){ const d=Math.sqrt(d2); sx+=dx/d; sy+=dy/d; }
+  }
+  const m=Math.hypot(sx,sy);
+  if(m>0){ en.x += (sx/m)*strength; en.y += (sy/m)*strength; }
+}
+// egyetlen összegzett kitérő-vektor, korlátozott elmozdulással (nincs "teleportálás")
+function dodgeBullets(en, strength){
+  let ax=0, ay=0;
+  for(const b of game.bullets){
+    const dx=en.x-b.x, dy=en.y-b.y, d=Math.hypot(dx,dy);
+    if(d<140 && d>0.01 && (b.vx*(-dx)+b.vy*(-dy) > 0)){ // felénk tart
+      let px=-b.vy, py=b.vx; const m=Math.hypot(px,py)||1; px/=m; py/=m;
+      const side=(px*dx+py*dy)>=0?1:-1;
+      ax += px*side; ay += py*side;
+    }
+  }
+  const m=Math.hypot(ax,ay);
+  if(m>0){ const move=en.speed*1.5*strength; en.x += (ax/m)*move; en.y += (ay/m)*move; }
+}
+
+/* =========================================================
+   SZINTLÉPÉS
+   ========================================================= */
+function levelUp(){
+  const p = game.player;
+  p.level++; p.xp = Math.max(0, p.xp - p.xpNext); p.xpNext = Math.floor(p.xpNext*1.45);
+  p.maxHp += 10; p.hp = Math.min(p.maxHp, p.hp + p.maxHp*0.3);
+  let sub;
+  // egy felszerelt képesség rangját növeljük (körben), ha van fejleszthető
+  const upg = p.abilities.filter(ab => ab.rank < (ABILITIES[ab.id].maxRank||3));
+  if(upg.length){
+    const ab = upg[p.level % upg.length];
+    ab.rank++;
+    sub = ABILITIES[ab.id].icon + ' ' + ABILITIES[ab.id].label + ' → ' + ab.rank + '. rang';
+  } else {
+    p.fireRate = Math.max(8, p.fireRate-1); p.bulletDmg += 2;
+    sub = 'Alap-sebzés és tűzgyorsaság nő!';
+  }
+  SFX.levelup();
+  document.getElementById('luText').textContent = 'SZINT ' + p.level;
+  document.getElementById('luSub').textContent = sub;
+  const banner = document.getElementById('levelUpBanner');
+  banner.classList.remove('hidden'); banner.style.opacity = 1;
+  setTimeout(()=>{ banner.style.transition='opacity .6s'; banner.style.opacity=0; }, 1400);
+  setTimeout(()=>{ banner.classList.add('hidden'); banner.style.transition=''; }, 2000);
+}
+/* =========================================================
+   FRISSÍTÉS
+   ========================================================= */
+function update(){
+  if(!game || game.state !== 'playing') return;
+  const p = game.player;
+  const w = canvas.width, h = canvas.height;
+  const dif = game.diff;
+  p._px = p.x; p._py = p.y;
+  const hp0 = p.hp;   // sérülés-hang detektáláshoz (frame végén hasonlítjuk)
+  const armorFactor = clamp(1 - (p.armor||0) + (p.buffs.berserk>0?0.2:0) - (p.buffs.boneward>0?0.35:0), 0.15, 2);
+
+  // --- Célzás + tüzelés (érintő vagy egér) ---
+  let firing;
+  const padCombat = pad.connected && (pad.aiming || pad.firing);   // kontroller célzás/tüzelés aktív
+  if(input.right.active){ p.facing = input.right.angle; firing = input.right.fire; }
+  else if(padCombat){ if(pad.aiming) p.facing = Math.atan2(pad.ay, pad.ax); firing = pad.firing; }
+  else if(input.touchMode){ firing = false; }
+  else { p.facing = Math.atan2(mouse.y-p.y, mouse.x-p.x); firing = mouse.down; }
+  if(input.right.active || padCombat || input.touchMode){ input.aimX = p.x+Math.cos(p.facing)*300; input.aimY = p.y+Math.sin(p.facing)*300; }
+  else { input.aimX = mouse.x; input.aimY = mouse.y; }
+
+  // --- Késleltetett spawn-sor (szünet-biztos) ---
+  if(game.pendingSpawns.length && !game.boss){
+    for(const s of game.pendingSpawns) s.timer--;
+    game.pendingSpawns.filter(s=>s.timer<=0).forEach(s=>spawnEnemyType(s.type));
+    game.pendingSpawns = game.pendingSpawns.filter(s=>s.timer>0);
+  }
+
+  // --- Mozgás (érintő analóg vagy billentyűzet) ---
+  let mvx=0, mvy=0;
+  if(input.left.active){ mvx=input.left.dx; mvy=input.left.dy; }
+  else if(pad.connected && (pad.mx!==0 || pad.my!==0)){ mvx=pad.mx; mvy=pad.my; }
+  else if(input.touchMode){ mvx=0; mvy=0; }
+  else {
+    if(keys['w']||keys['arrowup']) mvy -= 1;
+    if(keys['s']||keys['arrowdown']) mvy += 1;
+    if(keys['a']||keys['arrowleft']) mvx -= 1;
+    if(keys['d']||keys['arrowright']) mvx += 1;
+  }
+  let mag = Math.hypot(mvx,mvy);
+  if(mag>1){ mvx/=mag; mvy/=mag; mag=1; }
+  let sp = p.speed * (p.surgeActive>0 ? 1.5 : 1);
+  if(p.dashing > 0){ sp = p.speed * 3.0; p.dashing--; }
+  if(p.hazSlow>0){ if(p.dashing<=0) sp *= 0.5; p.hazSlow--; }   // fagyzóna lassítás
+  p.x = clamp(p.x + mvx*sp, p.r, w-p.r);
+  p.y = clamp(p.y + mvy*sp, safeTop+p.r*0.5, h-safeBottom-p.r*0.5);
+  resolveObstacles(p);
+  const moving = (mag>0.05);
+
+  // --- Buff / állapot időzítők + passzívok ---
+  if(p.surgeActive>0) p.surgeActive--;
+  if(p.shieldActive>0) p.shieldActive--;
+  if(p.invuln>0) p.invuln--;
+  for(const k in p.buffs){ if(p.buffs[k]>0) p.buffs[k]--; }
+  if(game.slowT>0) game.slowT--;
+  if(p.regen>0) p.hp = Math.min(p.maxHp, p.hp + p.regen);
+
+  // --- Környezeti veszélyzónák (láva / jég / elektromos) ---
+  if(game.hazards.length){
+    game.hazards.forEach(hz=>{
+      hz.ph = (hz.ph||0) + 0.05;
+      // a láva/sokk az ellenfeleket is égeti (be lehet csalni őket)
+      if(hz.kind!=='ice'){
+        game.enemies.forEach(en=>{ if(dist(en.x,en.y,hz.x,hz.y) < hz.r+en.r*0.4){ en.hp-=hz.dps*0.8; en.hitFlash=2; } });
+      }
+      // a játékos sebződik (ha nem sebezhetetlen/pajzsos), a jég ráadásul lassít
+      if(p.invuln<=0 && p.shieldActive<=0 && dist(p.x,p.y,hz.x,hz.y) < hz.r){
+        p.hp -= hz.dps*armorFactor;
+        if(hz.kind==='ice') p.hazSlow = 10;
+      }
+    });
+  }
+
+  // --- Felszerelt képességek (adatvezérelt) ---
+  p.abilities.forEach(ab=>{
+    if(ab.cd>0) ab.cd--;
+    if(ab.key && keys[ab.key] && ab.cd<=0){
+      ABILITIES[ab.id].run(p, ab.rank * (p.powerDamp||1) * abilityBalanceMult(ab.id));
+      ab.cd = Math.round(ABILITIES[ab.id].cdMax * (p.cdScale||1));
+      recordAbilityUse(ab.id);
+      SFX.ability();
+    }
+  });
+  // --- Ultimate (töltődő) + feltöltődés-jelzés ---
+  if(p.ult){
+    const rdy = p.ult.charge >= p.ult.chargeMax;
+    if(rdy && !p._ultRdy){ p._ultRdy = true; SFX.ultReady(); }
+    if(!rdy) p._ultRdy = false;
+  }
+  if(p.ult && p.ult.key && keys[p.ult.key] && p.ult.charge>=p.ult.chargeMax){
+    ULTIMATES[p.ult.id].run(p); p.ult.charge = 0;
+    SFX.ult(); padRumble(0.3, 0.7, 220);
+  }
+
+  // --- Fireball-ok terjedése ---
+  game.fireballs.forEach(f=>{ f.r+=3.1; f.life--; });
+  game.fireballs = game.fireballs.filter(f=>f.life>0);
+
+  // --- Tornyok ---
+  game.turrets.forEach(t=>{
+    t.life--; if(t.fireCd>0) t.fireCd--;
+    let nearest=null, best=99999;
+    game.enemies.forEach(en=>{ const d=dist(t.x,t.y,en.x,en.y); if(d<best){best=d; nearest=en;} });
+    if(t.mobile && nearest){
+      // szolgák/vadállatok üldözik és közelharcban is sebzik az ellenfelet
+      if(best>34){ const a=Math.atan2(nearest.y-t.y, nearest.x-t.x); const spd=t.beast?2.6:2.0;
+        t.x+=Math.cos(a)*spd; t.y+=Math.sin(a)*spd; }
+      else if(t.fireCd<=0){ nearest.hp -= (t.dmg||8); nearest.hitFlash=6; t.fireCd=26; addParticles(nearest.x,nearest.y,'#9d5cff',3); }
+    } else if(nearest && best<(t.heavy?360:300) && t.fireCd<=0){
+      t.fireCd = t.heavy?14:30; const a = Math.atan2(nearest.y-t.y, nearest.x-t.x);
+      game.bullets.push({ x:t.x,y:t.y, vx:Math.cos(a)*8, vy:Math.sin(a)*8, r:4, life:60, friendly:true, dmg:(t.dmg||8) });
+    }
+  });
+  game.turrets = game.turrets.filter(t=>t.life>0);
+
+  // --- Drónok (köröznek a játékos körül, lőnek vagy gyógyítanak) ---
+  game.drones.forEach(dr=>{
+    dr.life--; if(dr.fireCd>0) dr.fireCd--;
+    dr.ang = (dr.ang||Math.random()*6) + 0.05;
+    const tx=p.x+Math.cos(dr.ang)*48, ty=p.y+Math.sin(dr.ang)*48;
+    dr.x+=(tx-dr.x)*0.12; dr.y+=(ty-dr.y)*0.12;
+    if(dr.heal){
+      if(dr.fireCd<=0 && p.hp<p.maxHp){ dr.fireCd=50; p.hp=Math.min(p.maxHp,p.hp+p.maxHp*dr.heal*0.08); addParticles(p.x,p.y,'#8affc1',4); }
+      return;
+    }
+    let nearest=null, best=99999;
+    game.enemies.forEach(en=>{ const d=dist(dr.x,dr.y,en.x,en.y); if(d<best){best=d; nearest=en;} });
+    if(nearest && best<340 && dr.fireCd<=0){
+      dr.fireCd=22; const a=Math.atan2(nearest.y-dr.y,nearest.x-dr.x);
+      game.bullets.push({ x:dr.x,y:dr.y, vx:Math.cos(a)*9, vy:Math.sin(a)*9, r:4, life:55, friendly:true, dmg:(dr.dmg||7) });
+    }
+  });
+  game.drones = game.drones.filter(dr=>dr.life>0);
+
+  // --- Méregfelhők (folyamatos sebzés) ---
+  game.clouds.forEach(c=>{ c.life--;
+    if(c.heal){
+      c.healCd = (c.healCd||0) - 1;
+      if(c.healCd<=0 && dist(p.x,p.y,c.x,c.y)<c.r+p.r && p.hp<p.maxHp){
+        c.healCd = 40; p.hp = Math.min(p.maxHp, p.hp + p.maxHp*c.heal*0.1); addParticles(p.x,p.y,'#8affc1',4);
+      }
+      return;
+    }
+    // fontos: a sebző felhők nem minden képkockán ütnek, hanem 8 képkockánként —
+    // korábban hiányzott ez az ütemezés, ami 60x/mp-es sebzést eredményezett (hiba javítva)
+    c.dmgCd = (c.dmgCd||0) - 1;
+    if(c.dmgCd>0) return;
+    c.dmgCd = 8;
+    game.enemies.forEach(en=>{ if(dist(en.x,en.y,c.x,c.y)<c.r+en.r){ en.hp-=c.dmg; en.hitFlash=2; } });
+    if(game.boss && dist(game.boss.x,game.boss.y,c.x,c.y)<c.r+game.boss.r){ game.boss.hp-=c.dmg*0.6; }
+  });
+  game.clouds = game.clouds.filter(c=>c.life>0);
+
+  // --- Csapdák/aknák (Vadász, Gépész) — az első ráérő ellenfelet sebzik és gyökeret eresztik ---
+  game.traps.forEach(tr=>{
+    if(!tr.armed) return;
+    for(const en of game.enemies){
+      if(dist(en.x,en.y,tr.x,tr.y) < tr.r+en.r){
+        en.hp -= tr.dmg; en.hitFlash=8; en.frozen = Math.max(en.frozen||0, tr.root||50);
+        addParticles(tr.x,tr.y,'#c9a24a',16); tr.armed=false; break;
+      }
+    }
+  });
+  game.traps = game.traps.filter(tr=>tr.armed);
+
+  // --- Sugarak (railgun vizuál) ---
+  game.beams.forEach(bm=>bm.life--);
+  game.beams = game.beams.filter(bm=>bm.life>0);
+
+  // --- Meteorok / gránátok / cluster (közös becsapódás-rendszer) ---
+  game.meteors.forEach(m=>{
+    m.t++;
+    if(m.t>=m.delay && !m.exploded){
+      m.exploded = true;
+      game.enemies.forEach(en=>{ if(dist(en.x,en.y,m.x,m.y)<m.r+en.r){ en.hp-=m.dmg; en.hitFlash=10; } });
+      if(game.boss && dist(game.boss.x,game.boss.y,m.x,m.y)<m.r+game.boss.r){ game.boss.hp-=m.dmg*0.8; game.boss.hitFlash=10; }
+      game.barrels.forEach(bar=>{ if(!bar.dead && dist(bar.x,bar.y,m.x,m.y)<m.r+bar.r) bar.hp=0; });
+      addUltCharge(m.dmg*0.3); addParticles(m.x,m.y,m.color||'#ff8c3c',36); SFX.explosion(false);
+    }
+  });
+  game.meteors = game.meteors.filter(m=>m.t < m.delay+30);
+
+  // --- Alap lövés (class-statok + krit + buffok) ---
+  if(p.fireCooldown>0) p.fireCooldown--;
+  if(firing && p.fireCooldown<=0){
+    p.fireCooldown = p.fireRate;
+    const n = p.buffs.multishot>0 ? Math.max(3, p.bulletCount) : p.bulletCount;
+    const spreadA = (n>1) ? 0.16 : 0;
+    let base = p.bulletDmg * (1 + (p.lowHpDmg||0)*(1 - p.hp/p.maxHp));
+    if(p.buffs.berserk>0) base *= 1.25;
+    if(p.buffs.berserkUlt>0) base *= 1.7;
+    for(let i=0;i<n;i++){
+      const off = (i-(n-1)/2)*spreadA;
+      let dmg = base, crit=false;
+      if(p.buffs.precision>0 || Math.random() < (p.critChance||0)){ dmg*=2; crit=true; }
+      game.bullets.push({ x:p.x, y:p.y, vx:Math.cos(p.facing+off)*p.bulletSpeed, vy:Math.sin(p.facing+off)*p.bulletSpeed,
+        r:crit?6:5, life:75, dmg:Math.round(dmg), crit, pierce:p.buffs.precision>0 });
+    }
+    SFX.shoot(p.cls);
+  }
+  game.bullets.forEach(b=>{ b.x+=b.vx; b.y+=b.vy; b.life--; if(bulletHitsObstacle(b)) b.life=0; });
+  game.bullets = game.bullets.filter(b=>b.life>0 && b.x>-20&&b.x<w+20&&b.y>-20&&b.y<h+20);
+
+  // --- Ellenfelek AI ---
+  const ai = dif.ai;
+  game._egrid = buildEnemyGrid();
+  game.enemies.forEach(en=>{
+    if(en.hitFlash>0) en.hitFlash--;
+    if(en.strafeTimer>0){ en.strafeTimer--; } else { en.strafe*=-1; en.strafeTimer=40+Math.random()*60; }
+    if(en.frozen>0){ en.frozen--; return; }
+    // láthatatlanság: az ellenfelek a régi, elhagyott pontot keresik
+    const inv = p.buffs.invisible>0 && game._invisPt;
+    const tx = inv ? game._invisPt.x : p.x, ty = inv ? game._invisPt.y : p.y;
+    const d = dist(en.x,en.y,tx,ty);
+    const spd = en.speed * (game.slowT>0 ? 0.55 : 1);   // időlassítás
+    const ang = Math.atan2(ty-en.y, tx-en.x);
+    // előretartás: hova tartana a játékos
+    const tLead = clamp(d/6, 0, 42);
+    const lx = tx + (inv?0:p.vx)*tLead*ai, ly = ty + (inv?0:p.vy)*tLead*ai;
+    const pang = Math.atan2(ly-en.y, lx-en.x);
+
+    if(en.kind==='melee'){
+      en.x += Math.cos(pang)*spd; en.y += Math.sin(pang)*spd;
+      // bekerítés: közel érve oldalazva köröznek, nem torlódnak egymásra
+      if(d < en.r+p.r+80){ const perp=pang+Math.PI/2*en.strafe; en.x+=Math.cos(perp)*spd*0.55; en.y+=Math.sin(perp)*spd*0.55; }
+      separation(en, 0.75);
+      if(en.type==='scout' || ai>0.6) dodgeBullets(en, en.type==='scout'?ai*0.8:ai*0.5);
+      if(d < en.r+p.r && p.invuln<=0 && p.shieldActive<=0 && !inv){ p.hp -= en.dmg*0.16*armorFactor; p.invuln=8; addParticles(p.x,p.y,'#ff5c7c',3); }
+    } else if(en.kind==='charger'){
+      en.atkTimer++;
+      if(en.chargeState>0){
+        en.x += Math.cos(en.chargeAng)*spd*3.3; en.y += Math.sin(en.chargeAng)*spd*3.3; en.chargeState--;
+      } else if(en.telegraph>0){
+        en.telegraph--;
+        if(en.telegraph<=0){ en.chargeState=22; en.chargeAng = Math.atan2(ly-en.y, lx-en.x); }
+      } else {
+        if(d>70){ en.x+=Math.cos(ang)*spd; en.y+=Math.sin(ang)*spd; }
+        separation(en, 0.5);
+        if(en.atkTimer > (150 - ai*70)){ en.atkTimer=0; en.telegraph = Math.round(32 - ai*14); }
+      }
+      if(d < en.r+p.r && p.invuln<=0 && p.shieldActive<=0 && !inv){ p.hp -= en.dmg*0.16*armorFactor; p.invuln=8; addParticles(p.x,p.y,'#ff5c7c',3); }
+    } else if(en.kind==='bomber'){
+      // ravaszabb: enyhén előretartva közelít
+      en.x += Math.cos(pang)*spd; en.y += Math.sin(pang)*spd;
+      if(ai>0.85) dodgeBullets(en, ai*0.4);
+      if(d < en.r+p.r+6){
+        if(p.invuln<=0 && p.shieldActive<=0 && !inv) p.hp -= en.dmg*0.5*armorFactor;
+        addParticles(en.x,en.y,'#ff4d4d',24); en.hp = 0;
+      }
+    } else if(en.kind==='ranged'){
+      if(en.speed>0){
+        if(d < en.range*0.5){ en.x-=Math.cos(ang)*spd; en.y-=Math.sin(ang)*spd; }          // menekülés
+        else if(d > en.range){ en.x+=Math.cos(ang)*spd; en.y+=Math.sin(ang)*spd; }          // közelítés
+        else { const perp=ang+Math.PI/2*en.strafe; en.x+=Math.cos(perp)*spd*0.85; en.y+=Math.sin(perp)*spd*0.85; } // cikázás
+        if(ai>0.6) dodgeBullets(en, ai*0.5);
+      }
+      en.atkTimer++;
+      if(en.atkTimer > 90*dif.fireRate && d < en.range+40){
+        en.atkTimer = 0;
+        const bs = 5.2; const t2 = d/bs;
+        const ax = tx + (inv?0:p.vx)*t2*ai, ay = ty + (inv?0:p.vy)*t2*ai;
+        const a = Math.atan2(ay-en.y, ax-en.x);
+        game.enemyBullets.push({ x:en.x,y:en.y, vx:Math.cos(a)*bs, vy:Math.sin(a)*bs, r:6, life:160, dmg:en.dmg });
+        SFX.eshoot();
+      }
+    } else if(en.kind==='medic'){
+      if(d < en.range*0.6){ const a=Math.atan2(en.y-p.y,en.x-p.x); en.x+=Math.cos(a)*spd; en.y+=Math.sin(a)*spd; }
+      else if(d > en.range){ en.x+=Math.cos(ang)*spd; en.y+=Math.sin(ang)*spd; }
+      separation(en, 0.5);
+      en.atkTimer++;
+      if(en.atkTimer > 90){
+        en.atkTimer = 0;
+        gridNeighbors(en.x, en.y).forEach(other=>{
+          if(other!==en && dist(other.x,other.y,en.x,en.y) < 130 && other.hp < other.maxHp){
+            other.hp = Math.min(other.maxHp, other.hp + other.maxHp*0.25);
+            addParticles(other.x,other.y,'#8affc1',5);
+          }
+        });
+      }
+    }
+    resolveObstacles(en);
+  });
+
+  // --- Golyó -> ellenfél ütközés ---
+  game.bullets.forEach(b=>{
+    const bd = b.dmg || 12;
+    game.enemies.forEach(en=>{
+      if(b.life>0 && !(b._hit && b._hit.has(en)) && dist(b.x,b.y,en.x,en.y) < en.r+b.r){
+        en.hp -= bd; en.hitFlash=6; addParticles(b.x,b.y,en.color,4); addUltCharge(bd*0.35); SFX.hit();
+        if(!b.friendly && (p.buffs.lifesteal>0 || p.buffs.berserkUlt>0)) p.hp=Math.min(p.maxHp, p.hp + bd*0.12);
+        if(b.pierce){ if(!b._hit) b._hit=new Set(); b._hit.add(en); } else { b.life=0; }
+      }
+    });
+    if(game.boss && b.life>0 && !(b._hit && b._hit.has(game.boss)) && dist(b.x,b.y,game.boss.x,game.boss.y) < game.boss.r+b.r){
+      game.boss.hp -= bd*0.85; game.boss.hitFlash=6; addParticles(b.x,b.y,'#ff5c7c',5); addUltCharge(bd*0.35); SFX.hit();
+      if(b.pierce){ if(!b._hit) b._hit=new Set(); b._hit.add(game.boss); } else { b.life=0; }
+    }
+  });
+  // --- Tűzgolyó AOE ---
+  game.fireballs.forEach(f=>{
+    const fd = f.dmg || 26;
+    game.enemies.forEach(en=>{
+      if(!f.hitEnemies.has(en) && dist(f.x,f.y,en.x,en.y) < en.r+f.r){ en.hp-=fd; en.hitFlash=6; f.hitEnemies.add(en); addUltCharge(fd*0.3); addParticles(en.x,en.y,'#ffb14e',6); }
+    });
+    if(game.boss && !f.hitEnemies.has(game.boss) && dist(f.x,f.y,game.boss.x,game.boss.y) < game.boss.r+f.r){
+      game.boss.hp -= fd*0.85; game.boss.hitFlash=6; f.hitEnemies.add(game.boss);
+    }
+  });
+
+  // --- Interaktív pálya-elemek: robbanó hordók + rejtett ládák ---
+  if(game.barrels.length){
+    game.bullets.forEach(b=>{ if(b.life<=0) return;
+      for(const bar of game.barrels){ if(!bar.dead && dist(b.x,b.y,bar.x,bar.y) < bar.r+b.r){ bar.hp -= (b.dmg||12); b.life=0; break; } }
+    });
+    game.fireballs.forEach(f=>{ game.barrels.forEach(bar=>{ if(!bar.dead && dist(f.x,f.y,bar.x,bar.y) < f.r+bar.r) bar.hp=0; }); });
+    // robbanások feloldása láncreakcióval (guard a végtelen ciklus ellen)
+    let guard=0, toBlow=game.barrels.filter(bar=>!bar.dead && bar.hp<=0);
+    while(toBlow.length && guard++<50){ toBlow.forEach(explodeBarrel); toBlow=game.barrels.filter(bar=>!bar.dead && bar.hp<=0); }
+    game.barrels = game.barrels.filter(bar=>!bar.dead);
+  }
+  if(game.crates.length){
+    game.bullets.forEach(b=>{ if(b.life<=0) return;
+      for(const cr of game.crates){ if(!cr.dead && dist(b.x,b.y,cr.x,cr.y) < cr.r+b.r){ cr.hp -= (b.dmg||12); b.life=0; break; } }
+    });
+    game.crates.filter(cr=>!cr.dead && cr.hp<=0).forEach(cr=>{ cr.dead=true; dropLoot(cr); });
+    game.crates = game.crates.filter(cr=>!cr.dead);
+  }
+
+  // --- Halott ellenfelek + XP + raj-hasadás ---
+  game.enemies.filter(en=>en.hp<=0).forEach(en=>{
+    addParticles(en.x,en.y,en.color,14); SFX.enemyDie();
+    game.orbs.push({ x:en.x, y:en.y, xp: en.kind==='bomber'?0:Math.round(4+en.maxHp*0.2), r:6, t:0 });
+    if(en.splits && !en.isChild){
+      spawnEnemyType('swarmling', en.x-10, en.y, 0.5, 0.75);
+      spawnEnemyType('swarmling', en.x+10, en.y, 0.5, 0.75);
+    }
+    // Nekromanta passzíva: esély, hogy a legyőzött ellenfél csontváz-szolgaként feltámadjon
+    if(p.cls==='necromancer' && Math.random()<0.22 && game.turrets.length<10){
+      game.turrets.push({x:en.x,y:en.y,life:260,fireCd:0,dmg:7,mobile:true,skeleton:true});
+      addParticles(en.x,en.y,'#9d5cff',10);
+    }
+  });
+  game.enemies = game.enemies.filter(en=>en.hp>0);
+
+  // --- XP orbok ---
+  game.orbs.forEach(o=>{
+    o.t++;
+    const d = dist(o.x,o.y,p.x,p.y);
+    if(d<95){ const a=Math.atan2(p.y-o.y,p.x-o.x); o.x+=Math.cos(a)*5; o.y+=Math.sin(a)*5; }
+    if(d<20){ p.xp += o.xp; o.dead=true; SFX.orb(); while(p.xp>=p.xpNext) levelUp(); }
+  });
+  game.orbs = game.orbs.filter(o=>!o.dead);
+
+  // --- Részecskék ---
+  game.particles.forEach(pt=>{ pt.x+=pt.vx; pt.y+=pt.vy; pt.vx*=0.92; pt.vy*=0.92; pt.life--; });
+  game.particles = game.particles.filter(pt=>pt.life>0);
+
+  // --- Boss logika ---
+  if(game.boss){
+    const b = game.boss;
+    if(b.hitFlash>0) b.hitFlash--;
+    if(b.frozen>0){ b.frozen--; }
+    else {
+      b.attackTimer++;
+      const d = dist(b.x,b.y,p.x,p.y);
+      const a = Math.atan2(p.y-b.y, p.x-b.x);
+      if(d>260){ b.x+=Math.cos(a)*b.speed; b.y+=Math.sin(a)*b.speed; }
+      else if(d<160){ b.x-=Math.cos(a)*b.speed*0.7; b.y-=Math.sin(a)*b.speed*0.7; }
+      b.x = clamp(b.x,b.r,w-b.r); b.y = clamp(b.y,b.r,h-b.r);
+      resolveObstacles(b);
+      if(b.attackTimer > 80*dif.fireRate*(b.fireRate||1)){
+        b.attackTimer=0; SFX.bossShoot();
+        const bcol = b.col || '#ff5c7c';
+        const pats = b.patterns || ['spread','aimed'];
+        const pattern = pats[Math.floor(Math.random()*pats.length)];
+        if(pattern==='spread'){
+          for(let i=0;i<10;i++){ const ang2=(PI2/10)*i;
+            game.enemyBullets.push({ x:b.x,y:b.y, vx:Math.cos(ang2)*4, vy:Math.sin(ang2)*4, r:7, life:130, dmg:Math.round(8*dif.dmg), col:bcol }); }
+        } else if(pattern==='spiral'){
+          b.spiralAng = (b.spiralAng||0) + 0.5;
+          for(let i=0;i<6;i++){ const a2=b.spiralAng + (PI2/6)*i;
+            game.enemyBullets.push({ x:b.x,y:b.y, vx:Math.cos(a2)*4.5, vy:Math.sin(a2)*4.5, r:7, life:150, dmg:Math.round(8*dif.dmg), col:bcol }); }
+        } else {
+          const t2 = d/5.6; const ax=p.x+p.vx*t2*ai, ay=p.y+p.vy*t2*ai;
+          const ang2 = Math.atan2(ay-b.y, ax-b.x);
+          for(let i=-2;i<=2;i++){ const a2=ang2+i*0.14;
+            game.enemyBullets.push({ x:b.x,y:b.y, vx:Math.cos(a2)*5.6, vy:Math.sin(a2)*5.6, r:7, life:130, dmg:Math.round(8*dif.dmg), col:bcol }); }
+        }
+      }
+    }
+    if(b.hp<=0){
+      addParticles(b.x,b.y, b.col||'#ff5c7c',60); SFX.explosion(true);
+      const wasMini = b.isMini;
+      game.boss = null;
+      if(wasMini){ game.wave++; game.waveTimer=waveInterval(); spawnWave(); }
+      else if(game.mode==='story'){ nextChapter(); return; }
+      else { winGame(); return; }
+    }
+  }
+
+  // --- Ellenség golyók ---
+  game.enemyBullets.forEach(eb=>{
+    eb.x+=eb.vx; eb.y+=eb.vy; eb.life--; if(bulletHitsObstacle(eb)) eb.life=0;
+    if(p.invuln<=0 && p.shieldActive<=0 && dist(eb.x,eb.y,p.x,p.y) < eb.r+p.r){
+      p.hp -= (eb.dmg||8)*armorFactor; eb.life=0; p.invuln=10; addParticles(p.x,p.y,'#ff5c7c',6);
+    }
+  });
+  game.enemyBullets = game.enemyBullets.filter(eb=>eb.life>0 && eb.x>-30&&eb.x<w+30&&eb.y>-30&&eb.y<h+30);
+
+  // szétlőtt rombolható fedezékek eltakarítása
+  if(game.obstacles.some(o=>o._dead)){
+    game.obstacles.filter(o=>o._dead).forEach(o=>addParticles(o.x,o.y,o.dcol||'#8a97b3',18));
+    game.obstacles = game.obstacles.filter(o=>!o._dead);
+  }
+
+  if(p.hp < hp0 - 0.8){ SFX.hurt(); padRumble(0.5, 0.25, 120); }   // csak érdemi sérülésre (láva-tick nem spammel)
+  if(p.hp<=0){ p.hp=0; deathGame(); }
+
+  // sebesség kiszámítása AI-hoz (következő frame-hez)
+  p.vx = p.x - p._px; p.vy = p.y - p._py;
+
+  // --- Hullám / boss átmenet (időzített hullámok) ---
+  if(!game.boss && game.state==='playing'){
+    const cleared = game.enemies.length===0 && game.pendingSpawns.length===0;
+    if(isFinalWaveOut()){
+      // az utolsó rendes hullám már kint van: a boss a pálya megtisztításakor érkezik
+      if(cleared) triggerBossIntro();
+    } else {
+      // ha a pálya kiürült, a következő hullám rövid pihenő után előbb jön
+      if(cleared) game.waveTimer = Math.min(game.waveTimer, 120);
+      game.waveTimer--;
+      if(game.waveTimer<=0){
+        if(game.endless && game.wave>MAX_WAVES && ((game.wave-MAX_WAVES) % MINIBOSS_EVERY === 0)){
+          spawnBoss(true);
+        } else if(game.enemies.length + game.pendingSpawns.length >= 60){
+          game.waveTimer = 180;   // biztonsági plafon: ne torlódjon kezelhetetlen tömeg
+        } else {
+          if(game.mode==='story') game.chapterWave++;
+          game.wave++; game.waveTimer = waveInterval(); spawnWave();
+        }
+      }
+    }
+  }
+
+  updateHud();
+}
+
+// kör alakú akadályokból való kitolás
+function resolveObstacles(ent){
+  game.obstacles.forEach(o=>{
+    const d = dist(ent.x,ent.y,o.x,o.y);
+    const minD = ent.r + o.r;
+    if(d < minD && d > 0.001){
+      const push = (minD-d);
+      const nx=(ent.x-o.x)/d, ny=(ent.y-o.y)/d;
+      ent.x += nx*push; ent.y += ny*push;
+    }
+  });
+}
+function bulletHitsObstacle(b){
+  for(const o of game.obstacles){
+    if(dist(b.x,b.y,o.x,o.y) < o.r+b.r){
+      if(o.destructible){ o.hp -= (b.dmg||10); if(o.hp<=0) o._dead=true; }
+      return true;
+    }
+  }
+  return false;
+}
+function addParticles(x,y,color,n=8){
+  for(let i=0;i<n;i++){
+    const a = Math.random()*PI2, sp = 1+Math.random()*3;
+    game.particles.push({ x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:24+Math.random()*10, color });
+  }
+}
+/* =========================================================
+   ÁLLAPOTÁTMENETEK
+   ========================================================= */
+function triggerBossIntro(){
+  game.state='bossintro'; resetSticks(); SFX.boss();
+  document.getElementById('pauseBtn').classList.add('hidden');
+  const bd = game.chapter && game.chapter.boss;
+  const titleEl = document.getElementById('bossIntroTitle');
+  if(bd){
+    titleEl.textContent = bd.name;
+    titleEl.style.color = bd.col; titleEl.style.webkitTextFillColor = bd.col;
+    document.getElementById('bossIntroText').innerHTML = bd.intro || 'Az utolsó hullám leverve — most vagy soha.';
+  } else {
+    titleEl.textContent = 'A GONOSZ ÁRNYÉK';
+    titleEl.style.color = 'var(--accent2)'; titleEl.style.webkitTextFillColor = 'var(--accent2)';
+    document.getElementById('bossIntroText').innerHTML =
+      `"Szóval te vagy az, aki mind a kilenc pecsétet feltörte... Sokan próbálkoztak előtted. Mindannyian a sötétségben végezték."<br><br>` +
+      `Az utolsó hullám leverve — most vagy soha. Minden erődre szükséged lesz.`;
+  }
+  document.getElementById('bossIntro').classList.remove('hidden');
+}
+
+/* --- Story fejezet-haladás mentése (feloldja a következő fejezetet) --- */
+function markChapterCleared(idx){
+  const ch = CHAPTERS[idx]; if(!ch) return;
+  profile.storyProgress = Math.max(profile.storyProgress||0, idx+1);
+  profile.storyDone = profile.storyDone || [];
+  if(!profile.storyDone.includes(ch.id)) profile.storyDone.push(ch.id);
+  saveProfile();
+}
+
+/* --- Következő fejezet betöltése menü nélkül (vagy végső győzelem) --- */
+function nextChapter(){
+  markChapterCleared(game.chapterIndex);
+  const ni = game.chapterIndex + 1;
+  if(ni >= CHAPTERS.length){ winGame(); return; }
+  game.chapterIndex = ni;
+  game.chapter = CHAPTERS[ni];
+  selectedChapter = ni;
+  game.wave++;                 // a nehézség-számláló monoton nő a fejezetek közt
+  game.chapterWave = 1;
+  game.waveTimer = 90;
+  game.boss = null;
+  // repülő lövedékek / effektek / ellenfelek takarítása (endlessBtn minta)
+  game.enemies=[]; game.enemyBullets=[]; game.bullets=[]; game.particles=[]; game.orbs=[];
+  game.clouds=[]; game.beams=[]; game.fireballs=[]; game.meteors=[]; game.pendingSpawns=[]; game.slowT=0;
+  // a fejezet-boss legyőzése "megerősíti" a hőst — részleges gyógyulás, és garantáltan élve lép tovább
+  // (különben egy azonos frame-ben kapott halálos sérülés átúszna az új fejezetbe)
+  const pl = game.player; pl.hp = Math.min(pl.maxHp, Math.max(pl.hp, 0) + pl.maxHp*0.4); pl.invuln = Math.max(pl.invuln, 30);
+  loadChapterLayout(game.chapter);
+  startMusic(game.chapter.id);   // fejezet-téma váltás (a loop megy tovább)
+  showChapterIntro(game.chapter);
+}
+
+/* --- Fejezet előtti átvezető (futó játék közben, menü nélkül) --- */
+function showChapterIntro(ch){
+  game.state='chapterintro'; resetSticks();
+  document.getElementById('pauseBtn').classList.add('hidden');
+  renderStoryIntro();
+  document.getElementById('storyIntro').classList.remove('hidden');
+}
+
+/* --- Vissza a megfelelő menübe (mód szerint) --- */
+function goMenu(){
+  const story = game && game.mode==='story';
+  document.getElementById('winScreen').classList.add('hidden');
+  document.getElementById('deathScreen').classList.add('hidden');
+  document.getElementById('pauseScreen').classList.add('hidden');
+  hideCombatUI();
+  stopMusic();
+  game = null;
+  if(story){ showScreen('mapScreen'); renderMapCards(); }
+  else { showScreen('startScreen'); refreshMenu(); }
+}
+
+/* --- Aktuális futam újraindítása (halál utáni "Újrapróbálom") --- */
+function retryRun(){
+  document.getElementById('deathScreen').classList.add('hidden');
+  showScreen(); showCombatUI();
+  resetGame();     // a megőrzött startMode + selectedChapter szerint
+}
+function matchXp(bonus){
+  const g=game;
+  const base = g.wave*18 + g.player.level*22 + (g.endless?(g.wave-MAX_WAVES)*10:0) + (bonus||0);
+  const before = profileLevel();
+  awardXp(base);
+  const after = profileLevel();
+  refreshMenu();
+  return { earned: base, up: after>before ? after : 0 };
+}
+function hideCombatUI(){
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('abilityBar').classList.add('hidden');
+  document.getElementById('buffTray').classList.add('hidden');
+  document.getElementById('ultBtn').classList.add('hidden');
+  document.getElementById('pauseBtn').classList.add('hidden');
+}
+function winGame(){
+  game.state='win'; resetSticks(); stopMusic(); SFX.win();
+  const story = game.mode==='story';
+  if(story) markChapterCleared(game.chapterIndex);
+  const r = matchXp(story?260:150);
+  const endlessBtnEl = document.getElementById('endlessBtn');
+  const winTitle = document.querySelector('#winScreen .title');
+  if(story){
+    endlessBtnEl.classList.add('hidden');
+    if(winTitle) winTitle.textContent = 'A PECSÉTEK MEGERŐSÍTVE';
+    document.getElementById('winText').innerHTML =
+      `${game.player.name} mind a három pecsétet megerősítette, és a Sötétség visszahúzódott a mélybe.<br>`+
+      `Ám hat pecsét még feltöretlen — a háború nem ért véget.<br>`+
+      `<b>+${r.earned} profil-XP</b>` + (r.up?` — elérted a <b>${r.up}.</b> profilszintet! Új tartalom oldódott fel.`:'');
+    document.getElementById('restartBtnWin').textContent = 'VISSZA A TÉRKÉPRE';
+  } else {
+    endlessBtnEl.classList.remove('hidden');
+    if(winTitle) winTitle.textContent = 'GYŐZELEM';
+    document.getElementById('winText').innerHTML =
+      `${game.player.name} legyőzte a Gonosz Árnyékot, és mind a kilenc pecsét szabaddá vált.<br>`+
+      `<b>+${r.earned} profil-XP</b>` + (r.up?` — elérted a <b>${r.up}.</b> profilszintet! Új tartalom oldódott fel.`:'');
+    document.getElementById('restartBtnWin').textContent = 'ÚJ JÁTÉK';
+  }
+  document.getElementById('winScreen').classList.remove('hidden');
+  hideCombatUI();
+}
+function deathGame(){
+  game.state='dead'; resetSticks(); stopMusic(); SFX.death();
+  const r = matchXp(0);
+  let msg;
+  if(game.mode==='story' && game.chapter){
+    msg = `Elbuktál a(z) „${game.chapter.title}" pecséténél. A Sötétség egyelőre erősebb volt.<br>`;
+  } else if(game.endless){
+    msg = `${game.wave-MAX_WAVES}. végtelen hullámig jutottál. Az Árnyék erősebbnek bizonyult... egyelőre.<br>`;
+  } else {
+    msg = `A ${game.wave}. hullámig jutottál. Az Árnyék erősebbnek bizonyult... egyelőre.<br>`;
+  }
+  document.getElementById('deathText').innerHTML = msg +
+    `<b>+${r.earned} profil-XP</b>` + (r.up?` — elérted a <b>${r.up}.</b> profilszintet! Új tartalom oldódott fel.`:'');
+  document.getElementById('deathScreen').classList.remove('hidden');
+  hideCombatUI();
+}
+function togglePause(){
+  if(!game) return;
+  if(game.state==='playing'){
+    game.state='paused'; resetSticks();
+    if(SND.musGain) SND.musGain.gain.value = SND.musVol*0.25;   // szünetben halkabb zene
+    document.getElementById('pauseScreen').classList.remove('hidden');
+  } else if(game.state==='paused'){
+    game.state='playing';
+    if(SND.musGain) SND.musGain.gain.value = SND.musVol;
+    document.getElementById('pauseScreen').classList.add('hidden');
+  }
+}
+function updateHud(){
+  const p = game.player;
+  document.getElementById('hpBarFill').style.width = Math.max(0,(p.hp/p.maxHp*100))+'%';
+  document.getElementById('xpBarFill').style.width = (p.xp/p.xpNext*100)+'%';
+  document.getElementById('lvlLabel').textContent = 'SZINT '+p.level;
+  if(game.chapter){
+    document.getElementById('waveTitle').textContent = 'HULLÁM';
+    document.getElementById('waveNum').textContent = game.boss ? (game.boss.isMini?'MINI-BOSS':'BOSS') : (game.chapterWave+'/'+game.chapter.waveCount);
+    document.getElementById('modeTag').textContent = (game.chapterIndex+1)+'. FEJEZET · '+game.chapter.title.toUpperCase();
+  } else {
+    document.getElementById('waveTitle').textContent = 'HULLÁM';
+    document.getElementById('waveNum').textContent = game.boss ? (game.boss.isMini?'MINI-BOSS':'BOSS') : game.wave;
+    document.getElementById('modeTag').textContent = (game.endless?'VÉGTELEN · ':'') + game.diff.label.toUpperCase();
+  }
+  const alive = game.enemies.length + game.pendingSpawns.length;
+  document.getElementById('enemyCount').textContent = game.boss
+    ? Math.max(0,Math.ceil(game.boss.hp))+' / '+game.boss.maxHp+' HP'
+    : (isFinalWaveOut()
+        ? alive+' ellenfél · utána BOSS'
+        : alive+' ellenfél · köv. hullám '+Math.max(0,Math.ceil(game.waveTimer/60))+'s');
+}
+
+/* =========================================================
+   RAJZOLÁS
+   ========================================================= */
+function draw(){
+  const w=canvas.width, h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+  const th = (game && game.chapter) ? game.chapter.theme : null;
+  if(th && th.bg){ ctx.fillStyle=th.bg; ctx.fillRect(0,0,w,h); }
+  ctx.strokeStyle = (th && th.gridColor) || 'rgba(110,231,255,0.05)'; ctx.lineWidth=1; ctx.beginPath();
+  for(let x=0;x<w;x+=48){ ctx.moveTo(x,0); ctx.lineTo(x,h); }
+  for(let y=0;y<h;y+=48){ ctx.moveTo(0,y); ctx.lineTo(w,y); }
+  ctx.stroke();
+  if(!game) return;
+  const p = game.player;
+
+  // környezeti veszélyzónák (padló-réteg, lüktető)
+  game.hazards.forEach(hz=>{
+    const pulse = 0.5 + 0.5*Math.sin(hz.ph||0);
+    let c1,c2;
+    if(hz.kind==='ice'){ c1='rgba(150,210,255,'; c2='rgba(210,240,255,'; }
+    else if(hz.kind==='shock'){ c1='rgba(120,220,255,'; c2='rgba(190,240,255,'; }
+    else { c1='rgba(255,110,40,'; c2='rgba(255,200,80,'; }   // lava
+    ctx.beginPath(); ctx.arc(hz.x,hz.y,hz.r,0,PI2);
+    ctx.fillStyle = c1+(0.18+0.12*pulse)+')'; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle = c2+(0.5+0.3*pulse)+')'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(hz.x,hz.y,hz.r*0.6,0,PI2); ctx.fillStyle=c2+(0.10+0.10*pulse)+')'; ctx.fill();
+  });
+
+  // akadályok (romok + rombolható fedezékek)
+  const oFill=(th&&th.obstacleFill)||'#2a3348', oFill2=(th&&th.obstacleFill2)||'#333f58', oStroke=(th&&th.obstacleStroke)||'#454f6b';
+  game.obstacles.forEach(o=>{
+    if(o.destructible){
+      const dmgF = clamp(o.hp/(o.maxHp||o.hp||1),0,1);
+      ctx.save(); ctx.translate(o.x,o.y);
+      rr(ctx, -o.r,-o.r, o.r*2, o.r*2, o.r*0.25);
+      ctx.fillStyle = shade(o.dcol||'#6b563a', -0.15*(1-dmgF)); ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle = shade(o.dcol||'#6b563a', -0.4); ctx.stroke();
+      ctx.strokeStyle = shade(o.dcol||'#6b563a', -0.55); ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(-o.r*0.9,-o.r*0.2); ctx.lineTo(o.r*0.9,-o.r*0.2);
+      ctx.moveTo(-o.r*0.9,o.r*0.35); ctx.lineTo(o.r*0.9,o.r*0.35); ctx.stroke();
+      if(dmgF<0.6){ ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.moveTo(-o.r*0.3,-o.r*0.6); ctx.lineTo(o.r*0.1,0); ctx.lineTo(-o.r*0.2,o.r*0.6); ctx.stroke(); }
+      ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,PI2);
+      ctx.fillStyle = oFill; ctx.fill();
+      ctx.beginPath(); ctx.arc(o.x-o.r*0.25,o.y-o.r*0.25,o.r*0.55,0,PI2);
+      ctx.fillStyle = oFill2; ctx.fill();
+      ctx.strokeStyle = oStroke; ctx.lineWidth=2; ctx.stroke();
+    }
+  });
+
+  // robbanó hordók
+  game.barrels.forEach(bar=>{
+    ctx.save(); ctx.translate(bar.x,bar.y);
+    ctx.beginPath(); ctx.arc(0,0,bar.r,0,PI2);
+    ctx.fillStyle='#b8412e'; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle='#2a1410'; ctx.stroke();
+    ctx.fillStyle='#f0c040'; ctx.fillRect(-bar.r,-bar.r*0.28,bar.r*2,bar.r*0.16);
+    ctx.fillStyle='#1a0e0a'; ctx.font=`bold ${Math.round(bar.r)}px Trebuchet MS`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('☢', 0, bar.r*0.14);
+    ctx.restore();
+  });
+
+  // rejtett ládák (titkok)
+  game.crates.forEach(cr=>{
+    ctx.save(); ctx.translate(cr.x,cr.y);
+    rr(ctx,-cr.r,-cr.r,cr.r*2,cr.r*2,cr.r*0.2);
+    ctx.fillStyle = cr.loot==='heal'?'#3a6b4a':(cr.loot==='ult'?'#6b5a2a':'#5a4632'); ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle='#20160e'; ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(-cr.r,-cr.r); ctx.lineTo(cr.r,cr.r); ctx.moveTo(cr.r,-cr.r); ctx.lineTo(-cr.r,cr.r); ctx.stroke();
+    ctx.fillStyle='#ffd166'; ctx.font=`bold ${Math.round(cr.r*1.1)}px Trebuchet MS`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('?',0,cr.r*0.08);
+    ctx.restore();
+  });
+
+  // xp orbok
+  game.orbs.forEach(o=>{ ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,PI2);
+    ctx.fillStyle='#ffd166'; ctx.shadowColor='#ffd166'; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0; });
+
+  // méregfelhők / mezők (c.color szerint, hogy a lézerfal is elüsse a méregtől)
+  game.clouds.forEach(c=>{
+    const ccol = c.color||'#78dc78'; const [cr_,cg_,cb_]=hexToRgb(ccol);
+    ctx.beginPath(); ctx.arc(c.x,c.y,c.r,0,PI2);
+    ctx.fillStyle=`rgba(${cr_},${cg_},${cb_},${clamp(c.life/220,0,1)*0.28})`; ctx.fill();
+    ctx.strokeStyle=`rgba(${cr_},${cg_},${cb_},0.5)`; ctx.lineWidth=2; ctx.stroke();
+  });
+
+  // csapdák/aknák — halványan látszó jelölés a talajon (nem teljesen láthatatlan, hogy fair legyen)
+  game.traps.forEach(tr=>{
+    if(!tr.armed) return;
+    ctx.save(); ctx.globalAlpha = 0.55 + 0.25*Math.sin(Date.now()/220);
+    ctx.beginPath(); ctx.arc(tr.x,tr.y,tr.r*0.55,0,PI2);
+    ctx.strokeStyle='#c9a24a'; ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(201,162,74,0.18)'; ctx.fill();
+    ctx.restore();
+  });
+
+  // meteor célzó + robbanás (m.r / m.color szerint)
+  game.meteors.forEach(m=>{
+    const col = m.color||'#ff8c3c'; const R=m.r||110;
+    if(!m.exploded){
+      ctx.beginPath(); ctx.arc(m.x,m.y,R,0,PI2);
+      ctx.strokeStyle=col; ctx.globalAlpha=0.5; ctx.setLineDash([6,6]); ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+    } else {
+      const fade = 1-(m.t-m.delay)/30;
+      ctx.beginPath(); ctx.arc(m.x,m.y,R,0,PI2);
+      ctx.globalAlpha=Math.max(0,fade*0.4); ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    }
+  });
+
+  // sugarak (railgun)
+  game.beams.forEach(bm=>{
+    ctx.save(); ctx.translate(bm.x,bm.y); ctx.rotate(bm.a);
+    const a = clamp(bm.life/10,0,1);
+    ctx.globalAlpha=a; ctx.fillStyle='#bfe9ff'; ctx.shadowColor='#6ee7ff'; ctx.shadowBlur=18;
+    ctx.fillRect(0,-4,1600,8); ctx.fillStyle='#fff'; ctx.fillRect(0,-1.5,1600,3);
+    ctx.restore(); ctx.globalAlpha=1; ctx.shadowBlur=0;
+  });
+
+  // fireballs
+  game.fireballs.forEach(f=>{
+    ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,PI2);
+    ctx.fillStyle = `rgba(255,140,60,${clamp(f.life/70,0,1)*0.35})`; ctx.fill();
+    ctx.strokeStyle='#ff8c3c'; ctx.lineWidth=2; ctx.stroke();
+  });
+
+  // turrets (idézett ágyúk)
+  game.turrets.forEach(t=>{
+    ctx.beginPath(); ctx.arc(t.x,t.y,12,0,PI2);
+    ctx.fillStyle = p.color; ctx.shadowColor=p.color; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+  });
+
+  // drónok
+  game.drones.forEach(dr=>{
+    ctx.beginPath(); ctx.arc(dr.x,dr.y,9,0,PI2);
+    ctx.fillStyle='#cfe8ff'; ctx.shadowColor='#6ee7ff'; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
+    ctx.strokeStyle='#6ee7ff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#ff5c7c'; ctx.beginPath(); ctx.arc(dr.x,dr.y,2.5,0,PI2); ctx.fill();
+  });
+
+  // ellenfelek
+  game.enemies.forEach(en=>{
+    const face = Math.atan2(p.y-en.y, p.x-en.x);
+    // rohamozó figyelmeztetés / töltés-nyom
+    if(en.telegraph>0){ ctx.beginPath(); ctx.arc(en.x,en.y,en.r+8,0,PI2);
+      ctx.strokeStyle='rgba(255,80,80,0.8)'; ctx.lineWidth=3; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]); }
+    // törzs: típusonként eltérő sziluett
+    drawEnemyBody(ctx, en, face);
+    // megkülönböztető fej
+    if(en.hitFlash<=0 && en.frozen<=0) drawEnemyFace(ctx, en, face);
+    // hp sáv
+    ctx.fillStyle='#1c2333'; ctx.fillRect(en.x-16, en.y-en.r-10, 32, 4);
+    ctx.fillStyle='#ff5c7c'; ctx.fillRect(en.x-16, en.y-en.r-10, 32*clamp(en.hp/en.maxHp,0,1), 4);
+  });
+
+  // boss
+  if(game.boss){
+    const b = game.boss;
+    drawBoss(ctx, b, Math.atan2(p.y-b.y, p.x-b.x));
+    ctx.fillStyle='#1c2333'; ctx.fillRect(w/2-160,20,320,10);
+    ctx.fillStyle='#ff5c7c'; ctx.fillRect(w/2-160,20,320*clamp(b.hp/b.maxHp,0,1),10);
+  }
+
+  // ellenség golyók
+  game.enemyBullets.forEach(eb=>{ const ec=eb.col||'#ff5c7c'; ctx.beginPath(); ctx.arc(eb.x,eb.y,eb.r,0,PI2);
+    ctx.fillStyle=ec; ctx.shadowColor=ec; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0; });
+
+  // player golyók
+  game.bullets.forEach(b=>{ ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,PI2);
+    ctx.fillStyle= b.friendly? '#fff' : p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0; });
+
+  // részecskék / villámlánc vizuál
+  game.particles.forEach(pt=>{
+    if(pt.bolt){
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.globalAlpha=0.8;
+      ctx.beginPath(); ctx.moveTo(pt.x,pt.y); ctx.lineTo(pt.bolt.tx,pt.bolt.ty); ctx.stroke(); ctx.globalAlpha=1;
+      return;
+    }
+    ctx.globalAlpha = clamp(pt.life/30,0,1);
+    ctx.beginPath(); ctx.arc(pt.x,pt.y,2.4,0,PI2); ctx.fillStyle=pt.color; ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  // pajzs
+  if(p.shieldActive>0){
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r+10,0,PI2);
+    ctx.strokeStyle = `rgba(110,231,255,${clamp(p.shieldActive/90,0,1)})`; ctx.lineWidth=3; ctx.stroke();
+  }
+
+  // ---- JÁTÉKOS ----
+  if(p.buffs.invisible>0) ctx.globalAlpha = 0.4;
+  drawPlayer(ctx, p);
+  ctx.globalAlpha = 1;
+
+  // ---- érintős botkormányok ----
+  if(input.touchMode){
+    if(input.left.active) drawStick(ctx, input.left, '#6ee7ff');
+    else drawStickHint(ctx, 96, h-110, '#6ee7ff', 'MOZGÁS');
+    if(input.right.active) drawStick(ctx, input.right, '#ff5c7c');
+    else drawStickHint(ctx, w-96, h-110, '#ff5c7c', 'CÉLZÁS + LÖVÉS');
+  }
+
+  updateAbilityBar();
+}
+
+/* ---- Dinamikus képességsáv + ultimate + buff-tálca ---- */
+const abilityBarEl = document.getElementById('abilityBar');
+const buffTrayEl = document.getElementById('buffTray');
+const ultBtnEl = document.getElementById('ultBtn');
+function buildAbilityBar(){
+  const p = game.player;
+  abilityBarEl.innerHTML='';
+  p.abilities.forEach(ab=>{
+    const def = ABILITIES[ab.id];
+    const el = document.createElement('div');
+    el.className='abIcon unlocked';
+    el.innerHTML = `<span>${def.icon}</span><span class="key">${displayKey(ab.key)}</span>`;
+    const press=(e)=>{ e.preventDefault(); if(ab.key) keys[ab.key]=true; };
+    const release=(e)=>{ e.preventDefault(); if(ab.key) keys[ab.key]=false; };
+    el.addEventListener('pointerdown',press); el.addEventListener('pointerup',release);
+    el.addEventListener('pointerleave',release); el.addEventListener('pointercancel',release);
+    ab._el = el; abilityBarEl.appendChild(el);
+  });
+  ultBtnEl.querySelector('span').textContent = ULTIMATES[p.ult.id].icon;
+}
+function updateAbilityBar(){
+  if(!game) return;
+  const p = game.player;
+  p.abilities.forEach(ab=>{
+    const el = ab._el; if(!el) return;
+    let ov = el.querySelector('.cd');
+    if(ab.cd>0){
+      if(!ov){ ov=document.createElement('div'); ov.className='cd'; el.appendChild(ov); }
+      ov.textContent = Math.ceil(ab.cd/60*10)/10;
+    } else if(ov){ ov.remove(); }
+  });
+  const u=p.ult, pct=clamp(u.charge/u.chargeMax,0,1);
+  ultBtnEl.querySelector('.ultFill').style.height = (pct*100)+'%';
+  ultBtnEl.classList.toggle('ready', pct>=1);
+  const B=p.buffs, act=[];
+  if(B.precision>0) act.push('🎯'); if(B.berserkUlt>0) act.push('🔥'); if(B.invisible>0) act.push('🌑');
+  if(B.lifesteal>0) act.push('🩸'); if(B.berserk>0) act.push('😤'); if(B.multishot>0) act.push('🎇');
+  if(p.surgeActive>0) act.push('🌀'); if(game.slowT>0) act.push('⏳');
+  buffTrayEl.innerHTML = act.map(e=>`<span class="buff">${e}</span>`).join('');
+}
+// ult gomb bekötése (tap / kattintás)
+(function(){
+  const press=(e)=>{ e.preventDefault(); if(game&&game.player) keys[game.player.ult.key]=true; };
+  const release=(e)=>{ e.preventDefault(); if(game&&game.player) keys[game.player.ult.key]=false; };
+  ultBtnEl.addEventListener('pointerdown',press); ultBtnEl.addEventListener('pointerup',release);
+  ultBtnEl.addEventListener('pointerleave',release); ultBtnEl.addEventListener('pointercancel',release);
+})();
+
+// ---------- Fő ciklus ----------
+// FIX 60 Hz-es logika: a requestAnimationFrame a kijelző frissítésével pörög
+// (telefonon gyakran 90/120 Hz!), ezért az update() fix időlépéssel fut,
+// különben nagy frissítésű kijelzőn 1.5-2x sebességre gyorsulna a játék.
+const STEP_MS = 1000/60;
+let lastFrameT = 0, frameAcc = 0;
+function loop(t){
+  if(!lastFrameT) lastFrameT = t;
+  let dt = t - lastFrameT; lastFrameT = t;
+  if(dt > 250) dt = 250;               // tab-váltás/akadás után ne pörgesse be a felhalmozott időt
+  frameAcc += dt;
+  pollGamepad();
+  let steps = 0;
+  while(frameAcc >= STEP_MS && steps < 4){ update(); frameAcc -= STEP_MS; steps++; }
+  if(steps === 4) frameAcc = 0;        // lassú eszközön ne halmozódjon restancia (nincs halál-spirál)
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* =========================================================
+   UI ESEMÉNYEK
+   ========================================================= */
+function showCombatUI(){
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('abilityBar').classList.remove('hidden');
+  document.getElementById('buffTray').classList.remove('hidden');
+  document.getElementById('ultBtn').classList.remove('hidden');
+  document.getElementById('pauseBtn').classList.remove('hidden');
+  updateSafeMargins();
+  setTimeout(updateSafeMargins, 60);
+}
+function startPlay(){
+  if(listeningSlot!==null){ listeningSlot=null; buildLoadoutUI(); }
+  startMode='campaign';
+  showScreen(); showCombatUI();
+  resetGame();
+}
+document.getElementById('startBtn').addEventListener('click', startPlay);
+document.getElementById('storyModeBtn').addEventListener('click', ()=>{
+  if(listeningSlot!==null){ listeningSlot=null; buildLoadoutUI(); }
+  startMode='story';
+  selectedChapter = Math.min(profile.storyProgress||0, CHAPTERS.length-1);
+  showScreen('mapScreen'); renderMapCards();
+});
+document.getElementById('mapBackBtn').addEventListener('click', ()=>{ showScreen('startScreen'); });
+document.getElementById('storyStartBtn').addEventListener('click', ()=>{
+  if(game && game.state==='chapterintro'){
+    // futó játékban: a következő fejezet indítása menü nélkül
+    document.getElementById('storyIntro').classList.add('hidden');
+    document.getElementById('pauseBtn').classList.remove('hidden');
+    resetSticks(); game.state='playing'; spawnWave(); game.waveTimer=waveInterval();
+  } else {
+    // menüből: új story-futam a kiválasztott fejezettel
+    startMode='story';
+    showScreen(); showCombatUI();
+    resetGame();
+  }
+});
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('pauseRestartBtn').addEventListener('click', ()=>{
+  document.getElementById('pauseScreen').classList.add('hidden');
+  showCombatUI();
+  resetGame();
+});
+document.getElementById('pauseMenuBtn').addEventListener('click', goMenu);
+document.getElementById('bossStartBtn').addEventListener('click', ()=>{
+  document.getElementById('bossIntro').classList.add('hidden');
+  document.getElementById('pauseBtn').classList.remove('hidden');
+  resetSticks(); game.state='playing'; spawnBoss(false);
+});
+document.getElementById('endlessBtn').addEventListener('click', ()=>{
+  document.getElementById('winScreen').classList.add('hidden');
+  showCombatUI();
+  resetSticks();
+  game.enemyBullets=[]; game.bullets=[]; game.particles=[]; game.clouds=[]; game.beams=[]; game.slowT=0;
+  game.endless = true; game.state='playing'; game.wave = MAX_WAVES+1;
+  generateObstacles(); spawnWave();
+  game.waveTimer = waveInterval();
+  startMusic('default');
+});
+document.getElementById('restartBtnWin').addEventListener('click', goMenu);
+document.getElementById('restartBtnDeath').addEventListener('click', retryRun);
+document.getElementById('deathMenuBtn').addEventListener('click', goMenu);
+// hang-kapcsolók (főmenü + szünet képernyő)
+document.querySelectorAll('.sndSfxBtn').forEach(b=> b.addEventListener('click', toggleSfx));
+document.querySelectorAll('.sndMusBtn').forEach(b=> b.addEventListener('click', toggleMusic));
+applySndToggles();
+document.getElementById('installBtn').addEventListener('click', tryInstallApp);
+// ablakméret-/orientációváltás: story-propok újrapozicionálása a canvas-átméretezés után
+window.addEventListener('resize', ()=>{ if(game && game.chapter) relayoutChapter(); });
+</script>
+</body>
+</html>
